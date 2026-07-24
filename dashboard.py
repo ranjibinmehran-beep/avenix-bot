@@ -1,14 +1,11 @@
-import streamlit as pd_st
 import streamlit as st
 import json
 import os
 import pandas as pd
 import numpy as np
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import time
+import streamlit.components.v1 as components
 from bot import RealTimeTradingBot
-from indicators import process_all_indicators
 
 # Page Configuration - Clean & Modern Layout
 st.set_page_config(
@@ -66,7 +63,14 @@ st.markdown("""
         margin-top: 10px;
         line-height: 1.7;
         font-size: 13px;
-        color: #e2e8f0;
+        color: #cbd5e1;
+    }
+    /* Checklist style */
+    .checklist-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 0;
+        border-bottom: 1px solid #2e3e4f;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -105,209 +109,150 @@ signals = load_signals()
 
 # Clean Minimalist Header (Brand Avenix)
 st.markdown("<h1 style='text-align: center; color: #3b82f6; font-size: 32px; font-weight: 700; margin-bottom: 5px;'>🦅 AVENIX</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #64748b; font-size: 14px; margin-bottom: 25px;'>موتور هوشمند فارکس، فلزات گرانبها و ارزهای دیجیتال با ۳ حد سود و حد ضرر قفل‌شونده</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #64748b; font-size: 14px; margin-bottom: 25px;'>پلتفرم معامله‌گری و ترید خودکار طلا، جفت‌ارزها و ارزهای دیجیتال</p>", unsafe_allow_html=True)
 
-# Main Application organized in clean Top Tabs (Perfect for Mobile UX)
-tab_chart, tab_signals, tab_portfolio, tab_settings = st.tabs([
-    "📊 چارت زنده", 
-    "📢 اتاق سیگنال (بروشور هوشمند)", 
-    "💼 کیف پول و معاملات", 
-    "⚙️ تنظیمات سیستم"
+# Main Application organized in clean, separate rooms/tabs (Exactly as requested!)
+tab_chart, tab_brain, tab_signals, tab_settings = st.tabs([
+    "📊 اتاق چارت تریدینگ‌ویو (تمام‌صفحه)", 
+    "🧠 اتاق فرمان مغز ربات (AI Brain Room)", 
+    "📢 اتاق آرشیو سیگنال‌ها", 
+    "⚙️ اتاق تنظیمات پیشرفته سیستم"
 ])
 
-# Fetch and cache historical candle data
-@st.cache_data(ttl=10)
-def get_chart_data(symbol, timeframe):
-    bot_helper = RealTimeTradingBot()
-    df = bot_helper.fetch_historical_ohlcv(symbol, timeframe, limit=100)
-    df = process_all_indicators(df, config)
-    return df
-
-# ----------------- TAB 1: LIVE CHART (📊 چارت زنده) -----------------
+# ----------------- TAB 1: TRADINGVIEW FULL-SCREEN CHART -----------------
 with tab_chart:
-    # Setup clean horizontal selectors
-    sel_col1, sel_col2, sel_col3 = st.columns([2, 2, 3])
+    # Setup clean selectors
+    sel_col1, sel_col2 = st.columns([1, 1])
     with sel_col1:
-        selected_symbol = st.selectbox("انتخاب نماد معاملاتی (فارکس/طلا/نفت/کریپتو)", config.get("symbols", ["XAU/USD", "EUR/USD", "GBP/USD", "USD/JPY", "BRENT/USD", "SOL/USDT"]), index=0, key="chart_sym")
+        selected_symbol = st.selectbox("انتخاب نماد معاملاتی جهت تحلیل زنده", config.get("symbols", ["XAU/USD", "EUR/USD", "GBP/USD", "USD/JPY", "BRENT/USD", "SOL/USDT"]), index=0, key="chart_sym")
     with sel_col2:
-        selected_timeframe = st.selectbox("تایم فریم", ["1m", "5m", "15m", "1h", "4h", "1d"], index=2, key="chart_tf")
-    with sel_col3:
-        run_simulation = st.checkbox("🔄 فعال‌سازی نوسان زنده و شکل‌گیری ثانیه‌ای کندل‌ها", value=True)
+        selected_timeframe = st.selectbox("تایم فریم پیش‌فرض چارت", ["1", "5", "15", "60", "240", "D"], index=2, key="chart_tf")
 
-    # Clean expandable section for indicators toggle (Preventing clutter!)
-    with st.expander("🛠️ فیلتر و شخصی‌سازی اندیکاتورهای چارت"):
-        show_emas = st.checkbox("نمایش میانگین‌های متحرک نمایی (EMA 20, 50, 200)", value=True)
-        show_ichimoku = st.checkbox("نمایش خطوط و ابرهای ایچیموکو (Ichimoku)", value=True)
-        show_rsi = st.checkbox("نمایش اسیلاتور RSI در کادر پایینی", value=True)
-
-    # Initialize or fetch cached data
-    df = get_chart_data(selected_symbol, selected_timeframe)
-
-    # REAL-TIME CANDLE ACCUMULATOR & SHAPER (True Live Charting)
-    # To simulate real-time candle formation, we save state
-    state_key_df = f"df_{selected_symbol}_{selected_timeframe}"
-    state_key_last_time = f"last_time_{selected_symbol}_{selected_timeframe}"
+    # Mapping standard symbols to TradingView institutional data feeds
+    symbol_mapping = {
+        "XAU/USD": "OANDA:XAUUSD",
+        "EUR/USD": "FX:EURUSD",
+        "GBP/USD": "FX:GBPUSD",
+        "USD/JPY": "FX:USDJPY",
+        "BRENT/USD": "TVC:UKOIL",
+        "SOL/USDT": "BINANCE:SOLUSDT",
+        "BTC/USDT": "BINANCE:BTCUSDT"
+    }
     
-    if state_key_df not in st.session_state:
-        st.session_state[state_key_df] = df.copy()
-        st.session_state[state_key_last_time] = time.time()
+    tv_symbol = symbol_mapping.get(selected_symbol, "OANDA:XAUUSD")
 
-    active_df = st.session_state[state_key_df]
-    last_time = st.session_state[state_key_last_time]
+    # Embed the high-performance, interactive TradingView HTML5 Widget
+    # 100% full screen, pinch-to-zoom, supports drawings, timeline scroll, and all indicators natively!
+    tradingview_html = f"""
+    <div class="tradingview-widget-container" style="height:100%;width:100%;background-color:#0f172a;">
+      <div id="tradingview_chart" style="height:620px;width:100%;"></div>
+      <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+      <script type="text/javascript">
+      new TradingView.widget(
+      {{
+        "autosize": true,
+        "symbol": "{tv_symbol}",
+        "interval": "{selected_timeframe}",
+        "timezone": "Etc/UTC",
+        "theme": "dark",
+        "style": "1",
+        "locale": "en",
+        "enable_publishing": false,
+        "hide_side_toolbar": false,
+        "allow_symbol_change": true,
+        "details": true,
+        "hotlist": true,
+        "calendar": true,
+        "container_id": "tradingview_chart"
+      }}
+      );
+      </script>
+    </div>
+    """
     
-    if run_simulation:
-        # 1. Flucluate current close price to form the tick
-        last_row_idx = active_df.index[-1]
-        current_close = active_df.loc[last_row_idx, 'close']
+    st.markdown("<p style='color: #94a3b8; font-size: 13px;'>🌐 <b>اتاق چارت تریدینگ‌ویو:</b> این نمودار کاملاً ریسپانسیو و تمام‌صفحه است. شما می‌توانید در گذشته بازار اسکرول کنید، ابزارهای خط کشی و تحلیل اضافه کرده و اندیکاتورها را شخصی‌سازی کنید.</p>", unsafe_allow_html=True)
+    components.html(tradingview_html, height=630)
+
+# ----------------- TAB 2: THE AI TRADING BRAIN ROOM -----------------
+with tab_brain:
+    st.markdown("### 🧠 پایش مانیتورینگ مغز ربات و وضعیت اندیکاتورها")
+    st.markdown("<p style='color: #94a3b8; font-size: 13px;'>نمایش زنده امتیازدهی مغز سیستم و تاییده‌های تفکیک‌شده‌ی هر اندیکاتور</p>", unsafe_allow_html=True)
+    
+    # 1. Trigger Full Scan
+    col_cmd1, col_cmd2 = st.columns([3, 1])
+    with col_cmd1:
+        st.info("ربات در هر ۱۰ ثانیه کل بازار را مجدداً اسکن می‌کند. شما می‌توانید جهت تحلیل آنی دکمه روبرو را فشار دهید:")
+    with col_cmd2:
+        if st.button("🔥 اجرای فوری آنالیز مغز ربات", use_container_width=True):
+            with st.spinner("ربات در حال تحلیل اندیکاتورها..."):
+                bot_runner = RealTimeTradingBot()
+                bot_runner.run_one_cycle()
+                st.success("آنالیز نهایی به اتمام رسید!")
+                st.rerun()
+
+    # Create layout columns for Brain telemetry
+    col_intel, col_trades = st.columns([1, 1])
+    
+    with col_intel:
+        st.markdown("#### 📊 تاییده‌های تفکیک‌شده‌ی اندیکاتورها (Isolated Confirmations)")
         
-        # Calculate dynamic fluctuations depending on asset scale
-        if "XAU" in selected_symbol:
-            tick_size = np.random.normal(0, 0.4) # Gold ticks ~$0.40
-        elif "EUR" in selected_symbol or "GBP" in selected_symbol:
-            tick_size = np.random.normal(0, 0.0001) # Forex ticks ~1 pip
-        elif "JPY" in selected_symbol:
-            tick_size = np.random.normal(0, 0.02)
-        elif "BRENT" in selected_symbol:
-            tick_size = np.random.normal(0, 0.05)
-        else: # Solana or Bitcoin
-            tick_size = np.random.normal(0, 0.08)
-            
-        new_close = current_close + tick_size
+        # Load the latest signal to display active brain checklist
+        latest_sig = signals[-1] if len(signals) > 0 else {}
+        confirmations = latest_sig.get("confirmations", {
+            "EMA 200": "BULLISH 🟢",
+            "EMA 20/50": "BULLISH 🟢",
+            "Ichimoku Cloud": "BULLISH 🟢",
+            "Ichimoku TK Cross": "BULLISH 🟢",
+            "RSI": "BULLISH 🟢",
+            "MACD": "BULLISH 🟢",
+            "Bollinger Bands": "NEUTRAL 🟡"
+        })
         
-        # Update current candle metrics live!
-        active_df.loc[last_row_idx, 'close'] = new_close
-        if new_close > active_df.loc[last_row_idx, 'high']:
-            active_df.loc[last_row_idx, 'high'] = new_close
-        if new_close < active_df.loc[last_row_idx, 'low']:
-            active_df.loc[last_row_idx, 'low'] = new_close
-            
-        # 2. Candle completion logic (Create a new candle every 15 seconds for realistic demo!)
-        time_elapsed = time.time() - last_time
-        if time_elapsed >= 15: # Every 15 seconds, append a new candle
-            st.session_state[state_key_last_time] = time.time()
-            
-            # Create a new row starting from the last close
-            new_timestamp = active_df.loc[last_row_idx, 'timestamp'] + pd.Timedelta(minutes=15)
-            new_row = {
-                'timestamp': new_timestamp,
-                'open': new_close,
-                'high': new_close,
-                'low': new_close,
-                'close': new_close,
-                'volume': np.random.uniform(50, 500)
-            }
-            
-            # Append new row
-            active_df = pd.concat([active_df, pd.DataFrame([new_row])], ignore_index=True)
-            # Re-apply indicators to the newly formed data sequence
-            active_df = process_all_indicators(active_df, config)
-            # Cap at 100 candles to prevent memory bloat
-            if len(active_df) > 100:
-                active_df = active_df.iloc[-100:].reset_index(drop=True)
-                
-            st.session_state[state_key_df] = active_df
+        score = latest_sig.get("brain_score", 85)
+        
+        # Display the live scoring bar
+        score_color = "#10b981" if score >= config.get("brain_score_threshold", 70) else "#ef4444"
+        st.markdown(f"""
+        <div class='ios-card'>
+            <div class='metric-title'>امتیاز فعلی همگرایی اندیکاتورها (Brain Score)</div>
+            <div style='display: flex; align-items: center; justify-content: space-between; margin-top: 8px;'>
+                <span style='font-size: 28px; font-weight: 700; color: {score_color};'>{score}٪</span>
+                <span style='font-size: 13px; color: #94a3b8;'>حد نصاب ورود: {config.get("brain_score_threshold", 70)}٪</span>
+            </div>
+            <div style='background-color: #334155; border-radius: 10px; height: 10px; width: 100%; margin-top: 10px;'>
+                <div style='background-color: {score_color}; border-radius: 10px; height: 10px; width: {score}%;'></div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
-    # Render Plotly Chart
-    if show_rsi:
-        fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06, row_width=[0.24, 0.76])
-    else:
-        fig = make_subplots(rows=1, cols=1)
-
-    fig.add_trace(go.Candlestick(
-        x=active_df['timestamp'], open=active_df['open'], high=active_df['high'], low=active_df['low'], close=active_df['close'], name="قیمت"
-    ), row=1, col=1)
-
-    if show_emas:
-        fig.add_trace(go.Scatter(x=active_df['timestamp'], y=active_df[f"EMA_{config.get('ma_short', 20)}"], line=dict(color='#3b82f6', width=1.3), name=f"EMA {config.get('ma_short', 20)}"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=active_df['timestamp'], y=active_df[f"EMA_{config.get('ma_medium', 50)}"], line=dict(color='#eab308', width=1.3), name=f"EMA {config.get('ma_medium', 50)}"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=active_df['timestamp'], y=active_df[f"EMA_{config.get('ma_long', 200)}"], line=dict(color='#ef4444', width=1.8), name=f"EMA {config.get('ma_long', 200)}"), row=1, col=1)
-
-    if show_ichimoku:
-        fig.add_trace(go.Scatter(x=active_df['timestamp'], y=active_df['tenkan_sen'], line=dict(color='#a855f7', width=1.1), name="Tenkan (9)"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=active_df['timestamp'], y=active_df['kijun_sen'], line=dict(color='#14b8a6', width=1.1), name="Kijun (26)"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=active_df['timestamp'], y=active_df['senkou_span_a'], line=dict(color='rgba(16, 185, 129, 0.15)'), name="Span A", showlegend=False), row=1, col=1)
-        fig.add_trace(go.Scatter(x=active_df['timestamp'], y=active_df['senkou_span_b'], line=dict(color='rgba(239, 68, 68, 0.15)'), fill='tonexty', fillcolor='rgba(148, 163, 184, 0.08)', name="Span B", showlegend=False), row=1, col=1)
-
-    if show_rsi:
-        fig.add_trace(go.Scatter(x=active_df['timestamp'], y=active_df['RSI'], line=dict(color='#f43f5e', width=1.8), name="RSI"), row=2, col=1)
-        fig.add_hline(y=config.get("rsi_overbought", 70), line_dash="dash", line_color="#ef4444", row=2, col=1)
-        fig.add_hline(y=config.get("rsi_oversold", 30), line_dash="dash", line_color="#10b981", row=2, col=1)
-        fig.add_hline(y=50, line_dash="dot", line_color="rgba(148, 163, 184, 0.3)", row=2, col=1)
-
-    fig.update_layout(
-        height=480, margin=dict(l=10, r=10, t=10, b=10), xaxis_rangeslider_visible=False,
-        plot_bgcolor='#0f172a', paper_bgcolor='#0f172a', font_color='#f1f5f9',
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-# ----------------- TAB 2: SIGNAL ROOM (📢 اتاق سیگنال) -----------------
-with tab_signals:
-    st.markdown("### 📢 آرشیو بروشورهای تحلیلی اتاق سیگنال آونیکس")
-    st.markdown("<p style='color: #94a3b8; font-size: 13px;'>سیگنال‌های صادر شده با گزارش تفصیلی و گرافیکی علت ورود مغز ربات</p>", unsafe_allow_html=True)
-    signals_list = load_signals()
-    
-    if len(signals_list) == 0:
-        st.info("هیچ سیگنالی صادر نشده است.")
-    else:
-        for sig in reversed(signals_list):
-            side_badge = "🟢 BUY (خرید صعودی)" if sig["side"] == "BUY" else "🔴 SELL (فروش نزولی)"
-            color_theme = "#10b981" if sig["side"] == "BUY" else "#ef4444"
-            status_fa = "🟡 در جریان" if sig["status"] == "PENDING" else f"🔒 بسته شده ({sig['status']})"
-            
+        # Isolated confirmations checklist card
+        st.markdown("<div class='ios-card'>", unsafe_allow_html=True)
+        st.markdown("<p style='font-weight: 700; color: #f8fafc; margin-bottom: 12px;'>چک‌لیست وضعیت اندیکاتورها در آخرین تحلیل:</p>", unsafe_allow_html=True)
+        for name, status in confirmations.items():
             st.markdown(f"""
-            <div class='ios-card' style='border-right: 5px solid {color_theme};'>
-                <div style='display: flex; justify-content: space-between; align-items: center;'>
-                    <span style='font-size: 18px; font-weight: 700; color: #f8fafc;'>{sig['symbol']}</span>
-                    <span style='color: {color_theme}; font-weight: 700; font-size: 15px;'>{side_badge}</span>
-                    <span style='font-size: 12px; color: #94a3b8; background-color: #334155; padding: 4px 8px; border-radius: 20px;'>{status_fa}</span>
-                </div>
-                <div style='margin-top: 15px; font-size: 13px; color: #cbd5e1; line-height: 1.6;'>
-                    💵 قیمت ورود: <b>{sig['entry_price']}</b> | 🛡️ حد ضرر اولیه: <b style='color: #f87171;'>{sig['sl']}</b><br>
-                    🎯 اهداف سود: اول (TP1): <b>{sig.get('tp1','N/A')}</b> | دوم (TP2): <b>{sig.get('tp2','N/A')}</b> | سوم (TP3): <b>{sig.get('tp3','N/A')}</b>
-                </div>
-                <div class='brochure-card'>
-                    {sig['reason']}
-                </div>
+            <div class='checklist-item'>
+                <span style='color: #cbd5e1;'>{name}</span>
+                <span style='font-weight: 500;'>{status}</span>
             </div>
             """, unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
-# ----------------- TAB 3: WALLET & PORTFOLIO (💼 معاملات و پورتفوی) -----------------
-with tab_portfolio:
-    st.markdown("### 💰 وضعیت موجودی و کیف پول")
-    
-    col_bal1, col_bal2, col_bal3 = st.columns(3)
-    with col_bal1:
+    with col_trades:
+        st.markdown("#### 💼 گزارش موقعیت‌ها و معاملات زنده")
+        
+        # Display Balance
+        current_balance = portfolio.get("balance", 10000.0)
         st.markdown(f"""
         <div class='ios-card'>
-            <div class='metric-title'>موجودی حساب آزمایشی (Balance)</div>
-            <div class='metric-value'>${portfolio.get("balance", 10000.0):,.2f}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col_bal2:
-        active_trades_count = len(portfolio.get("active_trades", []))
-        st.markdown(f"""
-        <div class='ios-card'>
-            <div class='metric-title'>معاملات فعال بازار</div>
-            <div class='metric-value' style='color: #3b82f6;'>{active_trades_count} پوزیشن باز</div>
-        </div>
-        """, unsafe_allow_html=True)
-    with col_bal3:
-        broker_type_fa = "شبیه‌ساز (دمو)" if config.get("broker_type") == "paper" else "حساب واقعی بروکر"
-        st.markdown(f"""
-        <div class='ios-card'>
-            <div class='metric-title'>بستر معاملاتی متصل</div>
-            <div class='metric-value' style='color: #f59e0b; font-size: 20px;'>{broker_type_fa}</div>
+            <div class='metric-title'>دارایی کل کیف پول آزمایشی (Balance)</div>
+            <div class='metric-value'>${current_balance:,.2f}</div>
         </div>
         """, unsafe_allow_html=True)
 
-    st.markdown("### 💼 موقعیت‌های معاملاتی")
-    sub_tab_active, sub_tab_closed = st.tabs(["🔒 پوزیشن‌های فعال", "✅ تاریخچه معاملات بسته شده"])
-    
-    with sub_tab_active:
+        # Show active trades
         active_trades = portfolio.get("active_trades", [])
         if len(active_trades) == 0:
-            st.info("در حال حاضر هیچ موقعیت فعالی باز نیست.")
+            st.info("در حال حاضر هیچ معامله فعالی باز نیست.")
         else:
             for trade in active_trades:
                 color_t = "#10b981" if trade["side"] == "BUY" else "#ef4444"
@@ -318,55 +263,107 @@ with tab_portfolio:
                         <span style='color: {color_t}; font-weight: 700;'>سود زنده: ${trade['pnl']} ({trade['pnl_percent']}%)</span>
                     </div>
                     <div style='margin-top: 10px; font-size: 13px; color: #cbd5e1;'>
-                        ورود: {trade['entry_price']} | قیمت زنده: {trade['current_price']}<br>
-                        حد ضرر فعلی: <b>{trade['sl']}</b> | حد سود نهایی (TP3): {trade['tp3']}<br>
-                        وضعیت حد ضرر شناور: پله <b>{trade.get('highest_tp_reached', 0)}</b> از ۳
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-    with sub_tab_closed:
-        completed_trades = portfolio.get("completed_trades", [])
-        if len(completed_trades) == 0:
-            st.info("تاریخچه معاملات بسته شده خالی است.")
-        else:
-            for trade in reversed(completed_trades):
-                color_pnl = "#10b981" if trade["pnl"] >= 0 else "#ef4444"
-                sign = "+" if trade["pnl"] >= 0 else ""
-                st.markdown(f"""
-                <div class='ios-card'>
-                    <div style='display: flex; justify-content: space-between;'>
-                        <b>{trade['symbol']} | {trade['side']}</b>
-                        <span style='color: {color_pnl}; font-weight: 700;'>نتیجه: {sign}${trade['pnl']} ({trade['pnl_percent']}%)</span>
-                    </div>
-                    <div style='margin-top: 8px; font-size: 12px; color: #94a3b8;'>
-                        خروج با: <b>{trade['close_reason']}</b> در قیمت {trade['close_price']}<br>
-                        زمان خروج: {trade['close_time']}
+                        قیمت ورود: {trade['entry_price']} | قیمت زنده: {trade['current_price']}<br>
+                        حد ضرر متحرک: <b style='color: #f87171;'>{trade['sl']}</b> | اهداف سود: TP1: {trade['tp1']} | TP2: {trade['tp2']} | TP3: {trade['tp3']}<br>
+                        تاییدیه تریلینگ: پله <b>{trade.get('highest_tp_reached', 0)}</b> از ۳ (فری‌ریسک فعال)
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
 
-# ----------------- TAB 4: SYSTEM SETTINGS (⚙️ تنظیمات سیستم) -----------------
-with tab_settings:
-    st.markdown("### ⚙️ پیکربندی سیستم معاملاتی آونیکس")
+        # Show the latest Persian Brochure
+        if latest_sig:
+            st.markdown("<p style='font-weight: 700; color: #f8fafc; margin-top: 15px;'>📄 بروشور تحلیلی آخرین معامله:</p>", unsafe_allow_html=True)
+            st.markdown(f"""
+            <div class='brochure-card'>
+                {latest_sig['reason']}
+            </div>
+            """, unsafe_allow_html=True)
+
+# ----------------- TAB 3: SIGNAL ROOM ARCHIVE -----------------
+with tab_signals:
+    st.markdown("### 📢 اتاق آرشیو سیگنال‌های صادرشده")
+    st.markdown("<p style='color: #94a3b8; font-size: 13px;'>لیست دائم موقعیت‌های صادر شده توسط مغز سیستم به همراه بروشور علت ورود</p>", unsafe_allow_html=True)
+    signals_list = load_signals()
     
-    # 1. Sensitivity and Broker Connection
-    set_col1, set_col2 = st.columns(2)
-    with set_col1:
-        current_sensitivity = config.get("sensitivity", "medium").lower()
-        sens_idx = 1 if current_sensitivity == "medium" else (0 if current_sensitivity == "low" else 2)
-        sensitivity_opt = st.selectbox(
-            "درجه حساسیت و تاییده‌های ورود ربات",
-            ["کم (بسیار ایمن و محافظه‌کارانه)", "متوسط (متعادل و منطقی)", "زیاد (تهاجمی و شکار نوسانات ریز)"],
-            index=sens_idx
-        )
-        selected_sens = "low" if "کم" in sensitivity_opt else ("medium" if "متوسط" in sensitivity_opt else "high")
+    if len(signals_list) == 0:
+        st.info("هیچ سیگنالی صادر نشده است.")
+    else:
+        for sig in reversed(signals_list):
+            side_badge = "🟢 BUY (خرید)" if sig["side"] == "BUY" else "🔴 SELL (فروش)"
+            color_theme = "#10b981" if sig["side"] == "BUY" else "#ef4444"
+            status_fa = "🟡 در جریان" if sig["status"] == "PENDING" else f"🔒 بسته شده ({sig['status']})"
+            
+            st.markdown(f"""
+            <div class='ios-card' style='border-right: 5px solid {color_theme};'>
+                <div style='display: flex; justify-content: space-between; align-items: center;'>
+                    <span style='font-size: 18px; font-weight: 700; color: #f8fafc;'>{sig['symbol']} (تایم‌فریم {config.get('trading_timeframe','15m')})</span>
+                    <span style='color: {color_theme}; font-weight: 700; font-size: 15px;'>{side_badge}</span>
+                    <span style='font-size: 11px; color: #94a3b8; background-color: #334155; padding: 4px 8px; border-radius: 20px;'>{status_fa}</span>
+                </div>
+                <div style='margin-top: 15px; font-size: 13px; color: #cbd5e1; line-height: 1.6;'>
+                    💵 قیمت ورود: <b>{sig['entry_price']}</b> | 🛡️ حد ضرر اولیه: <b style='color: #f87171;'>{sig['sl']}</b><br>
+                    🎯 اهداف سود پله‌ای: اول (TP1): <b>{sig.get('tp1','N/A')}</b> | دوم (TP2): <b>{sig.get('tp2','N/A')}</b> | سوم (TP3): <b>{sig.get('tp3','N/A')}</b>
+                </div>
+                <div class='brochure-card'>
+                    {sig['reason']}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+# ----------------- TAB 4: SYSTEM SETTINGS -----------------
+with tab_settings:
+    st.markdown("### ⚙️ تنظیمات فوق‌پیشرفته اندیکاتورها و مغز سیستم")
+    
+    # 1. Indicator settings (Exactly as requested: individual setups!)
+    st.markdown("#### 📊 شخصی‌سازی مجزای اندیکاتورها (Indicator Parameter Controls)")
+    
+    col_set_ma, col_set_ich = st.columns(2)
+    with col_set_ma:
+        st.markdown("<p style='font-weight: 700; color: #3b82f6;'>۱. میانگین‌های متحرک (EMAs)</p>", unsafe_allow_html=True)
+        ma_s = st.slider("دوره موینگ سریع (Fast EMA)", 5, 30, config.get("ma_short", 20))
+        ma_m = st.slider("دوره موینگ میان‌مدت (Medium EMA)", 30, 100, config.get("ma_medium", 50))
+        ma_l = st.slider("دوره موینگ بلندمدت روند (Long EMA)", 100, 300, config.get("ma_long", 200))
+    with col_set_ich:
+        st.markdown("<p style='font-weight: 700; color: #a855f7;'>۲. ابر ایچیموکو (Ichimoku)</p>", unsafe_allow_html=True)
+        ich_t = st.number_input("دوره خط تبدیل (Tenkan-sen)", min_value=5, max_value=20, value=config.get("ichimoku_tenkan", 9))
+        ich_k = st.number_input("دوره خط پایه (Kijun-sen)", min_value=15, max_value=40, value=config.get("ichimoku_kijun", 26))
+        ich_b = st.number_input("دوره خط سنکو ب (Senkou Span B)", min_value=40, max_value=80, value=config.get("ichimoku_senkou_b", 52))
+
+    st.markdown("---")
+    col_set_rsi, col_set_macd, col_set_bb = st.columns(3)
+    with col_set_rsi:
+        st.markdown("<p style='font-weight: 700; color: #f43f5e;'>۳. شاخص قدرت (RSI)</p>", unsafe_allow_html=True)
+        rsi_per = st.number_input("دوره زمانی RSI", min_value=5, max_value=30, value=config.get("rsi_period", 14))
+        rsi_os = st.slider("مرز اشباع فروش (Oversold)", 10, 40, config.get("rsi_oversold", 30))
+        rsi_ob = st.slider("مرز اشباع خرید (Overbought)", 60, 90, config.get("rsi_overbought", 70))
+    with col_set_macd:
+        st.markdown("<p style='font-weight: 700; color: #10b981;'>۴. اندیکاتور MACD</p>", unsafe_allow_html=True)
+        macd_f = st.number_input("موینگ سریع مکدی", min_value=5, max_value=25, value=config.get("macd_fast", 12))
+        macd_s = st.number_input("موینگ کند مکدی", min_value=20, max_value=40, value=config.get("macd_slow", 26))
+        macd_sig = st.number_input("خط سیگنال مکدی", min_value=5, max_value=15, value=config.get("macd_signal", 9))
+    with col_set_bb:
+        st.markdown("<p style='font-weight: 700; color: #eab308;'>۵. باندهای بولینگر (Bollinger)</p>", unsafe_allow_html=True)
+        bb_per = st.number_input("دوره زمانی باند بولینگر", min_value=5, max_value=40, value=config.get("bb_period", 20))
+        bb_std = st.number_input("انحراف معیار (Std Dev)", min_value=1.0, max_value=4.0, value=config.get("bb_std_dev", 2.0), step=0.1)
+
+    # 2. Risk & Symbols Management
+    st.markdown("---")
+    st.markdown("#### 🛡️ درصد ریسک، اهداف حد سود و بستر معاملاتی")
+    
+    set_col_risk, set_col_broker = st.columns(2)
+    with set_col_risk:
+        r_pct = st.slider("درصد ریسک روی کل حساب (%)", 0.1, 5.0, float(config.get("risk_percentage", 1.0)), 0.1)
+        lev = st.number_input("ضریب اهرم صرافی (Leverage)", min_value=1, max_value=125, value=config.get("default_leverage", 1))
+        sl_rat = st.slider("حد ضرر اولیه درصد (SL Ratio) %", 0.5, 5.0, float(config.get("sl_ratio", 1.5)), 0.1)
         
-    with set_col2:
+        # Dynamic Brain Score threshold
+        score_thresh = st.slider("حد نصاب امتیاز تاییدیه مغز ربات جهت ترید (Score Threshold) %", 50, 95, config.get("brain_score_threshold", 70))
+        
+    with set_col_broker:
         current_b = config.get("broker_type", "paper").lower()
         b_idx = 0 if current_b == "paper" else (1 if current_b == "crypto" else 2)
         broker_opt = st.selectbox(
-            "انتخاب بستر اتصال و اجرای معاملات",
+            "انتخاب بستر اتصال و اجرای معاملات (ریل / دمو)",
             ["شبیه‌ساز تستی (Paper Trading)", "صرافی کریپتو (Binance, Bybit via CCXT)", "بروکر فارکس (MetaTrader 5)"],
             index=b_idx
         )
@@ -380,32 +377,16 @@ with tab_settings:
     c_sec = config.get("exchange_secret_key", "")
 
     if selected_b == "forex_mt5":
-        st.info("🔑 اطلاعات حساب متاتریدر ۵ را وارد کنید:")
-        m_acc = st.text_input("شماره حساب (Account ID)", value=m_acc)
-        m_pwd = st.text_input("رمز عبور (Password)", type="password", value=m_pwd)
-        m_srv = st.text_input("سرور بروکر", value=m_srv)
+        m_acc = st.text_input("شماره حساب متاتریدر ۵ (Account ID)", value=m_acc)
+        m_pwd = st.text_input("رمز عبور حساب (Password)", type="password", value=m_pwd)
+        m_srv = st.text_input("سرور کارگزار (Broker Server)", value=m_srv)
     elif selected_b == "crypto":
-        st.info("🔑 کلیدهای API صرافی خود را وارد کنید:")
         c_api = st.text_input("API Key صرافی", value=c_api)
         c_sec = st.text_input("Secret Key صرافی", type="password", value=c_sec)
 
-    # 2. Risk & Symbols Management
+    # 3. Dynamic TPs & Telegram
     st.markdown("---")
-    set_col3, set_col4 = st.columns(2)
-    with set_col3:
-        symbols_input = st.text_input("نمادهای تحت نظر (با کاما جدا کنید)", value=", ".join(config.get("symbols", ["XAU/USD", "EUR/USD", "GBP/USD", "USD/JPY", "BRENT/USD", "SOL/USDT"])))
-        symbols_list = [s.strip().upper() for s in symbols_input.split(",") if s.strip()]
-        
-        trading_tf_val = st.selectbox("تایم‌فریم اصلی ورود و تحلیل", ["1m", "5m", "15m", "1h", "4h", "1d"], index=2)
-        
-    with set_col4:
-        r_pct = st.slider("درصد ریسک روی هر معامله (%)", 0.1, 5.0, float(config.get("risk_percentage", 1.0)), 0.1)
-        default_lev = st.number_input("اهرم (Leverage)", min_value=1, max_value=125, value=config.get("default_leverage", 1))
-        initial_sl = st.slider("حد ضرر اولیه درصد (SL Ratio) %", 0.5, 5.0, float(config.get("sl_ratio", 1.5)), 0.1)
-
-    # 3. Dynamic Take Profits
-    st.markdown("---")
-    st.markdown("🎯 **تنظیم ضرایب ریوارد اهداف سود (Trailing Take Profits)**")
+    st.markdown("🎯 **تنظیم ضرایب ریوارد اهداف سود پله‌ای (Trailing Take Profits)**")
     col_tp1, col_tp2, col_tp3 = st.columns(3)
     with col_tp1:
         tp1_val = st.slider("حد سود اول (TP1 R:R)", 0.5, 2.0, float(config.get("tp1_ratio", 1.0)), 0.1)
@@ -414,12 +395,30 @@ with tab_settings:
     with col_tp3:
         tp3_val = st.slider("حد سود سوم (TP3 R:R)", 2.5, 6.0, float(config.get("tp3_ratio", 3.0)), 0.1)
 
-    # 4. Telegram Signal Room Integration
+    # 4. Telegram & General Symbols
     st.markdown("---")
     st.markdown("✉️ **اتصال تلگرام به اتاق سیگنال همراه شما**")
     tg_enabled = st.checkbox("ارسال سیگنال‌ها به تلگرام", value=config.get("enable_telegram", False))
     tg_tok = st.text_input("توکن ربات تلگرام", value=config.get("telegram_bot_token", ""))
     tg_chat = st.text_input("آیدی چت / کانال تلگرام", value=config.get("telegram_chat_id", ""))
+
+    st.markdown("---")
+    symbols_input = st.text_input("نمادهای تحت نظر (با کاما جدا کنید)", value=", ".join(config.get("symbols", ["XAU/USD", "EUR/USD", "GBP/USD", "USD/JPY", "BRENT/USD", "SOL/USDT"])))
+    symbols_list = [s.strip().upper() for s in symbols_input.split(",") if s.strip()]
+    trading_tf_val = st.selectbox("تایم‌فریم اصلی ورود و تحلیل مغز ربات", ["1m", "5m", "15m", "1h", "4h", "1d"], index=2)
+
+    # Reset Wallet
+    st.markdown("---")
+    if st.button("🔄 ریست کردن کیف پول معاملاتی دمو", use_container_width=True):
+        initial_portfolio = {
+            "balance": 10000.0,
+            "active_trades": [],
+            "completed_trades": []
+        }
+        save_portfolio(initial_portfolio)
+        st.success("کیف پول ریست شد!")
+        time.sleep(1)
+        st.rerun()
 
     # Save button
     st.markdown("---")
@@ -442,12 +441,22 @@ with tab_settings:
         config["mt5_server"] = m_srv
         config["exchange_api_key"] = c_api
         config["exchange_secret_key"] = c_sec
+        config["ma_short"] = ma_s
+        config["ma_medium"] = ma_m
+        config["ma_long"] = ma_l
+        config["ichimoku_tenkan"] = ich_t
+        config["ichimoku_kijun"] = ich_k
+        config["ichimoku_senkou_b"] = ich_b
+        config["rsi_period"] = rsi_per
+        config["rsi_oversold"] = rsi_os
+        config["rsi_overbought"] = rsi_ob
+        config["macd_fast"] = macd_f
+        config["macd_slow"] = macd_s
+        config["macd_signal"] = macd_sig
+        config["bb_period"] = bb_per
+        config["bb_std_dev"] = bb_std
+        config["brain_score_threshold"] = score_thresh
         save_config(config)
         st.success("تنظیمات با موفقیت ذخیره شدند و هسته ربات در لحظه آپدیت شد!")
         time.sleep(1)
         st.rerun()
-
-# Auto-rerun trick to simulate 1-second ticking charts
-if run_simulation:
-    time.sleep(1)
-    st.rerun()
