@@ -121,14 +121,12 @@ tab_chart, tab_brain, tab_signals, tab_settings = st.tabs([
 
 # ----------------- TAB 1: TRADINGVIEW FULL-SCREEN CHART -----------------
 with tab_chart:
-    # Setup clean selectors
     sel_col1, sel_col2 = st.columns([1, 1])
     with sel_col1:
         selected_symbol = st.selectbox("انتخاب نماد معاملاتی جهت تحلیل زنده", config.get("symbols", ["XAU/USD", "EUR/USD", "GBP/USD", "USD/JPY", "BRENT/USD", "SOL/USDT"]), index=0, key="chart_sym")
     with sel_col2:
         selected_timeframe = st.selectbox("تایم فریم پیش‌فرض چارت", ["1", "5", "15", "60", "240", "D"], index=2, key="chart_tf")
 
-    # Mapping standard symbols to TradingView institutional data feeds
     symbol_mapping = {
         "XAU/USD": "OANDA:XAUUSD",
         "EUR/USD": "FX:EURUSD",
@@ -141,8 +139,6 @@ with tab_chart:
     
     tv_symbol = symbol_mapping.get(selected_symbol, "OANDA:XAUUSD")
 
-    # Embed the high-performance, interactive TradingView HTML5 Widget
-    # 100% full screen, pinch-to-zoom, supports drawings, timeline scroll, and all indicators natively!
     tradingview_html = f"""
     <div class="tradingview-widget-container" style="height:100%;width:100%;background-color:#0f172a;">
       <div id="tradingview_chart" style="height:620px;width:100%;"></div>
@@ -178,7 +174,6 @@ with tab_brain:
     st.markdown("### 🧠 پایش مانیتورینگ مغز ربات و وضعیت اندیکاتورها")
     st.markdown("<p style='color: #94a3b8; font-size: 13px;'>نمایش زنده امتیازدهی مغز سیستم و تاییده‌های تفکیک‌شده‌ی هر اندیکاتور</p>", unsafe_allow_html=True)
     
-    # 1. Trigger Full Scan
     col_cmd1, col_cmd2 = st.columns([3, 1])
     with col_cmd1:
         st.info("ربات در هر ۱۰ ثانیه کل بازار را مجدداً اسکن می‌کند. شما می‌توانید جهت تحلیل آنی دکمه روبرو را فشار دهید:")
@@ -190,13 +185,11 @@ with tab_brain:
                 st.success("آنالیز نهایی به اتمام رسید!")
                 st.rerun()
 
-    # Create layout columns for Brain telemetry
     col_intel, col_trades = st.columns([1, 1])
     
     with col_intel:
         st.markdown("#### 📊 تاییده‌های تفکیک‌شده‌ی اندیکاتورها (Isolated Confirmations)")
         
-        # Load the latest signal to display active brain checklist
         latest_sig = signals[-1] if len(signals) > 0 else {}
         confirmations = latest_sig.get("confirmations", {
             "EMA 200": "BULLISH 🟢",
@@ -210,7 +203,6 @@ with tab_brain:
         
         score = latest_sig.get("brain_score", 85)
         
-        # Display the live scoring bar
         score_color = "#10b981" if score >= config.get("brain_score_threshold", 70) else "#ef4444"
         st.markdown(f"""
         <div class='ios-card'>
@@ -225,7 +217,6 @@ with tab_brain:
         </div>
         """, unsafe_allow_html=True)
 
-        # Isolated confirmations checklist card
         st.markdown("<div class='ios-card'>", unsafe_allow_html=True)
         st.markdown("<p style='font-weight: 700; color: #f8fafc; margin-bottom: 12px;'>چک‌لیست وضعیت اندیکاتورها در آخرین تحلیل:</p>", unsafe_allow_html=True)
         for name, status in confirmations.items():
@@ -240,7 +231,6 @@ with tab_brain:
     with col_trades:
         st.markdown("#### 💼 گزارش موقعیت‌ها و معاملات زنده")
         
-        # Display Balance
         current_balance = portfolio.get("balance", 10000.0)
         st.markdown(f"""
         <div class='ios-card'>
@@ -270,7 +260,6 @@ with tab_brain:
                 </div>
                 """, unsafe_allow_html=True)
 
-        # Show the latest Persian Brochure
         if latest_sig:
             st.markdown("<p style='font-weight: 700; color: #f8fafc; margin-top: 15px;'>📄 بروشور تحلیلی آخرین معامله:</p>", unsafe_allow_html=True)
             st.markdown(f"""
@@ -355,16 +344,14 @@ with tab_settings:
         r_pct = st.slider("درصد ریسک روی کل حساب (%)", 0.1, 5.0, float(config.get("risk_percentage", 1.0)), 0.1)
         lev = st.number_input("ضریب اهرم صرافی (Leverage)", min_value=1, max_value=125, value=config.get("default_leverage", 1))
         sl_rat = st.slider("حد ضرر اولیه درصد (SL Ratio) %", 0.5, 5.0, float(config.get("sl_ratio", 1.5)), 0.1)
-        
-        # Dynamic Brain Score threshold
         score_thresh = st.slider("حد نصاب امتیاز تاییدیه مغز ربات جهت ترید (Score Threshold) %", 50, 95, config.get("brain_score_threshold", 70))
         
     with set_col_broker:
         current_b = config.get("broker_type", "paper").lower()
         b_idx = 0 if current_b == "paper" else (1 if current_b == "crypto" else 2)
         broker_opt = st.selectbox(
-            "انتخاب بستر اتصال و اجرای معاملات (ریل / دمو)",
-            ["شبیه‌ساز تستی (Paper Trading)", "صرافی کریپتو (Binance, Bybit via CCXT)", "بروکر فارکس (MetaTrader 5)"],
+            "انتخاب بستر اتصال و اجرای معاملات (ریل / دمو / پروپ‌فرم / مسابقات)",
+            ["شبیه‌ساز تستی (Paper Trading)", "صرافی کریپتو (Binance, Bybit via CCXT)", "بروکر فارکس و پروپ‌فرم‌ها (MetaTrader 5)"],
             index=b_idx
         )
         selected_b = "paper" if "شبیه‌ساز" in broker_opt else ("crypto" if "صرافی" in broker_opt else "forex_mt5")
@@ -377,12 +364,29 @@ with tab_settings:
     c_sec = config.get("exchange_secret_key", "")
 
     if selected_b == "forex_mt5":
+        st.info("🔌 اتصال به کارگزاری فارکس (لایت فایننس، آلپاری، بینگ‌اکس) یا حساب‌های چالش پروپ‌فرم (FundedNext و غیره):")
         m_acc = st.text_input("شماره حساب متاتریدر ۵ (Account ID)", value=m_acc)
         m_pwd = st.text_input("رمز عبور حساب (Password)", type="password", value=m_pwd)
-        m_srv = st.text_input("سرور کارگزار (Broker Server)", value=m_srv)
-    elif selected_b == "crypto":
-        c_api = st.text_input("API Key صرافی", value=c_api)
-        c_sec = st.text_input("Secret Key صرافی", type="password", value=c_sec)
+        m_srv = st.text_input("سرور کارگزار (Broker Server - مثلاً FundedNext-Server)", value=m_srv)
+        
+        # Prop firm drawdown lock settings
+        st.markdown("<p style='font-weight: 700; color: #f87171;'>🛡️ سیستم ضد کال‌مارجین و محافظ چالش‌های پروپ‌فرم (Avenix Prop Guard)</p>", unsafe_allow_html=True)
+        prop_dd = st.slider("حداکثر دروداون (افت سرمایه) مجاز روزانه حساب در پروپ‌فرم یا مسابقه %", 1.0, 10.0, float(config.get("prop_drawdown_limit", 4.0)), 0.1)
+        
+        # Unlock button if locked
+        if config.get("prop_drawdown_breached", False):
+            st.error("🚨 قفل محافظ دروداون روزانه فعال شده است! معاملات موقتاً مسدود هستند.")
+            if st.button("🔓 ریست کردن دستی قفل دروداون روزانه ربات"):
+                config["prop_drawdown_breached"] = False
+                save_config(config)
+                st.success("قفل ربات باز شد!")
+                time.sleep(1)
+                st.rerun()
+        else:
+            st.success("🟢 محافظ دروداون روزانه فعال و حساب در حاشیه امنیت کامل قرار دارد.")
+            prop_dd_val = prop_dd
+    else:
+        prop_dd_val = config.get("prop_drawdown_limit", 4.0)
 
     # 3. Dynamic TPs & Telegram
     st.markdown("---")
@@ -395,12 +399,31 @@ with tab_settings:
     with col_tp3:
         tp3_val = st.slider("حد سود سوم (TP3 R:R)", 2.5, 6.0, float(config.get("tp3_ratio", 3.0)), 0.1)
 
-    # 4. Telegram & General Symbols
+    # 4. Multi-Platform Social Broadcast Room Settings
     st.markdown("---")
-    st.markdown("✉️ **اتصال تلگرام به اتاق سیگنال همراه شما**")
-    tg_enabled = st.checkbox("ارسال سیگنال‌ها به تلگرام", value=config.get("enable_telegram", False))
-    tg_tok = st.text_input("توکن ربات تلگرام", value=config.get("telegram_bot_token", ""))
-    tg_chat = st.text_input("آیدی چت / کانال تلگرام", value=config.get("telegram_chat_id", ""))
+    st.markdown("### ✉️ اتاق مدیریت انتشار سیگنال‌ها (Bale, Telegram, WhatsApp)")
+    st.markdown("<p style='color: #94a3b8; font-size: 13px;'>ارسال فوق‌سریع و همزمان بروشورهای تحلیلی ربات به پیام‌رسان‌های ایرانی و خارجی</p>", unsafe_allow_html=True)
+    
+    col_tg, col_bale, col_wa = st.columns(3)
+    
+    with col_tg:
+        st.markdown("<p style='font-weight: 700; color: #3b82f6;'>۱. پیام‌رسان تلگرام (Telegram)</p>", unsafe_allow_html=True)
+        tg_enabled = st.checkbox("فعال‌سازی ارسال به تلگرام", value=config.get("enable_telegram", False))
+        tg_tok = st.text_input("توکن ربات تلگرام", value=config.get("telegram_bot_token", ""))
+        tg_chat = st.text_input("آیدی چت / کانال تلگرام", value=config.get("telegram_chat_id", ""))
+        
+    with col_bale:
+        st.markdown("<p style='font-weight: 700; color: #10b981;'>۲. پیام‌رسان ایرانی بله (Bale)</p>", unsafe_allow_html=True)
+        bale_enabled = st.checkbox("فعال‌سازی ارسال به بله", value=config.get("enable_bale", False))
+        bale_tok = st.text_input("توکن ربات بله (Bale Token)", value=config.get("bale_bot_token", ""))
+        bale_chat = st.text_input("آیدی چت / کانال بله", value=config.get("bale_chat_id", ""))
+        
+    with col_wa:
+        st.markdown("<p style='font-weight: 700; color: #eab308;'>۳. پیام‌رسان واتس‌اپ (WhatsApp)</p>", unsafe_allow_html=True)
+        wa_enabled = st.checkbox("فعال‌سازی ارسال به واتس‌اپ", value=config.get("enable_whatsapp", False))
+        wa_inst = st.text_input("شناسه درگاه (Instance ID)", value=config.get("whatsapp_instance_id", "instance99999"))
+        wa_tok = st.text_input("توکن درگاه واتس‌اپ", value=config.get("whatsapp_token", ""))
+        wa_phone = st.text_input("شماره تلفن مقصد (مثلاً 989123456789)", value=config.get("whatsapp_phone", ""))
 
     st.markdown("---")
     symbols_input = st.text_input("نمادهای تحت نظر (با کاما جدا کنید)", value=", ".join(config.get("symbols", ["XAU/USD", "EUR/USD", "GBP/USD", "USD/JPY", "BRENT/USD", "SOL/USDT"])))
@@ -422,18 +445,28 @@ with tab_settings:
 
     # Save button
     st.markdown("---")
-    if st.button("💾 ذخیره و اعمال نهایی تنظیمات آونیکس", use_container_width=True):
+    if st.button("💾 ذخیره و اعمال نهایی تمام تنظیمات فوق‌پیشرفته آونیکس", use_container_width=True):
         config["symbols"] = symbols_list
         config["trading_timeframe"] = trading_tf_val
         config["risk_percentage"] = r_pct
-        config["default_leverage"] = default_lev
-        config["sl_ratio"] = initial_sl
+        config["default_leverage"] = lev
+        config["sl_ratio"] = sl_rat
         config["tp1_ratio"] = tp1_val
         config["tp2_ratio"] = tp2_val
         config["tp3_ratio"] = tp3_val
+        
+        # Save Social Broadcast configs
         config["enable_telegram"] = tg_enabled
         config["telegram_bot_token"] = tg_tok
         config["telegram_chat_id"] = tg_chat
+        config["enable_bale"] = bale_enabled
+        config["bale_bot_token"] = bale_tok
+        config["bale_chat_id"] = bale_chat
+        config["enable_whatsapp"] = wa_enabled
+        config["whatsapp_instance_id"] = wa_inst
+        config["whatsapp_token"] = wa_tok
+        config["whatsapp_phone"] = wa_phone
+        
         config["sensitivity"] = selected_sens
         config["broker_type"] = selected_b
         config["mt5_account_id"] = m_acc
@@ -456,6 +489,7 @@ with tab_settings:
         config["bb_period"] = bb_per
         config["bb_std_dev"] = bb_std
         config["brain_score_threshold"] = score_thresh
+        config["prop_drawdown_limit"] = prop_dd_val
         save_config(config)
         st.success("تنظیمات با موفقیت ذخیره شدند و هسته ربات در لحظه آپدیت شد!")
         time.sleep(1)

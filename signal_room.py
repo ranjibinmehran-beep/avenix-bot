@@ -31,9 +31,10 @@ class SignalRoom:
     def save_signals(self):
         self.save_json(self.signals_path, self.signals)
 
-    def add_signal(self, symbol, side, entry_price, sl, tp1, tp2, tp3, reason, indicators):
+    def add_signal(self, symbol, side, entry_price, sl, tp1, tp2, tp3, reason, indicators, brain_score=85, confirmations=None):
         """
-        Adds a new multi-target signal to the local database and transmits it to Telegram.
+        Adds a new multi-target signal to the local database and transmits it to multiple
+        platforms: Telegram, Bale (Iranian), and WhatsApp.
         """
         signal_id = int(time.time() * 1000)
         signal_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
@@ -50,14 +51,23 @@ class SignalRoom:
             "tp3": tp3,
             "reason": reason,
             "indicators": indicators,
+            "brain_score": brain_score,
+            "confirmations": confirmations or {},
             "status": "PENDING"
         }
         
         self.signals.append(new_signal)
         self.save_signals()
         
+        # Dispatch to configured channels simultaneously!
         if self.config.get("enable_telegram", False):
             self.send_telegram_alert(new_signal)
+            
+        if self.config.get("enable_bale", False):
+            self.send_bale_alert(new_signal)
+            
+        if self.config.get("enable_whatsapp", False):
+            self.send_whatsapp_alert(new_signal)
             
         return new_signal
 
@@ -74,52 +84,100 @@ class SignalRoom:
         if updated:
             self.save_signals()
 
+    def generate_message_text(self, signal):
+        """
+        Generates a standard beautifully formatted Persian message for all broadcast channels.
+        """
+        direction_emoji = "🟢 BUY (LONG) | خرید صعودی" if signal["side"] == "BUY" else "🔴 SELL (SHORT) | فروش نزولی"
+        
+        message = (
+            f"🔔 *سیگنال جدید از مغز معاملاتی آونیکس* 🔔\n\n"
+            f"📈 *نماد معاملاتی:* {signal['symbol']}\n"
+            f"↕️ *جهت معامله:* {direction_emoji}\n"
+            f"💵 *نقطه ورود مناسب:* {signal['entry_price']}\n"
+            f"🛡️ *حد ضرر اولیه (SL):* {signal['sl']}\n\n"
+            f"🎯 *اهداف حد سود پله‌ای (Take Profits):*\n"
+            f" ├ 🎯 پله اول (TP1): {signal['tp1']}\n"
+            f" ├ 🎯 پله دوم (TP2): {signal['tp2']}\n"
+            f" └ 🎯 پله سوم (TP3): {signal['tp3']}\n\n"
+            f"⚠️ *مدیریت ریسک متحرک (Trailing Stop):*\n"
+            f" └ با لمس هر پله حد سود، استاپ لاس به طور خودکار جهت قفل سود بالا کشیده می‌شود (سیستم فری‌ریسک فعال).\n\n"
+            f"🧠 *گزارش بروشور تحلیل مغز ربات (Brain Score: {signal.get('brain_score', 80)}%):*\n"
+            f"{signal['reason']}\n\n"
+            f"⏰ *زمان صدور سیگنال:* {signal['time']}\n"
+            f"🤖 _سیستم فعال و مدیریت خودکار ریسک برقرار است_"
+        )
+        return message
+
     def send_telegram_alert(self, signal):
         token = self.config.get("telegram_bot_token")
         chat_id = self.config.get("telegram_chat_id")
         
         if not token or not chat_id or token == "YOUR_TELEGRAM_BOT_TOKEN":
-            print("[Telegram] Skip: Missing Bot credentials in config.")
+            print("[Telegram] Skip: Missing credentials.")
             return
 
-        direction_emoji = "🟢 BUY (LONG) | خرید" if signal["side"] == "BUY" else "🔴 SELL (SHORT) | فروش"
-        
-        message = (
-            f"🔔 *سیگنال جدید در اتاق معاملات (کاملاً هوشمند)* 🔔\n\n"
-            f"📈 *نماد:* {signal['symbol']}\n"
-            f"↕️ *جهت معامله:* {direction_emoji}\n"
-            f"💵 *نقطه ورود:* {signal['entry_price']}\n"
-            f"🛡️ *حد ضرر اولیه (SL):* {signal['sl']}\n\n"
-            f"🎯 *اهداف حد سود (Take Profit Targets):*\n"
-            f" ├ 🎯 هدف اول (TP1): {signal['tp1']}\n"
-            f" ├ 🎯 هدف دوم (TP2): {signal['tp2']}\n"
-            f" └ 🎯 هدف سوم (TP3): {signal['tp3']}\n\n"
-            f"⚠️ *استراتژی حد ضرر شناور (Trailing Stop):*\n"
-            f" └ با رسیدن قیمت به TP1 حد ضرر به نقطه ورود، با رسیدن به TP2 حد ضرر به TP1 و با رسیدن به TP3 حد ضرر به TP2 جابجا می‌شود.\n\n"
-            f"🧠 *دلیل تحلیل مغز سیستم:* {signal['reason']}\n\n"
-            f"📊 *اندیکاتورها:*\n"
-            f" └ RSI: {signal['indicators'].get('rsi')}\n"
-            f" └ EMA 20: {signal['indicators'].get('ema20')}\n"
-            f" └ EMA 50: {signal['indicators'].get('ema50')}\n"
-            f" └ EMA 200: {signal['indicators'].get('ema200')}\n"
-            f" └ Ichimoku Tenkan: {signal['indicators'].get('tenkan')}\n"
-            f" └ Ichimoku Kijun: {signal['indicators'].get('kijun')}\n\n"
-            f"⏰ *زمان صدور:* {signal['time']}\n"
-            f"🤖 _سیستم فعال و مدیریت خودکار ریسک فعال است_"
-        )
-        
+        message = self.generate_message_text(signal)
         url = f"https://api.telegram.org/bot{token}/sendMessage"
-        payload = {
-            "chat_id": chat_id,
-            "text": message,
-            "parse_mode": "Markdown"
-        }
+        payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
         
         try:
             r = requests.post(url, json=payload, timeout=5)
             if r.status_code == 200:
-                print(f"[Telegram] Signal successfully posted for {signal['symbol']}.")
-            else:
-                print(f"[Telegram] Error: Received status code {r.status_code}. Response: {r.text}")
+                print(f"[Telegram] Broadcast successful for {signal['symbol']}.")
         except Exception as e:
-            print(f"[Telegram] Failed to connect: {e}")
+            print(f"[Telegram] Connection failed: {e}")
+
+    def send_bale_alert(self, signal):
+        """
+        Sends formatted message to Bale messenger bot API (fully compatible with Telegram API schema!).
+        """
+        token = self.config.get("bale_bot_token")
+        chat_id = self.config.get("bale_chat_id")
+        
+        if not token or not chat_id or token == "YOUR_BALE_BOT_TOKEN":
+            print("[Bale] Skip: Missing credentials.")
+            return
+
+        # Bale bot API uses exactly the same payload structure as Telegram!
+        message = self.generate_message_text(signal)
+        url = f"https://tapi.bale.ai/bot{token}/sendMessage"
+        payload = {"chat_id": chat_id, "text": message}
+        
+        try:
+            r = requests.post(url, json=payload, timeout=5)
+            if r.status_code == 200:
+                print(f"[Bale] Broadcast successful for {signal['symbol']}.")
+            else:
+                print(f"[Bale] Error: {r.status_code} - {r.text}")
+        except Exception as e:
+            print(f"[Bale] Connection failed: {e}")
+
+    def send_whatsapp_alert(self, signal):
+        """
+        Sends formatted message to WhatsApp using a clean, universal HTTP API gateway (e.g., UltraMsg).
+        """
+        instance_id = self.config.get("whatsapp_instance_id")
+        token = self.config.get("whatsapp_token")
+        phone = self.config.get("whatsapp_phone")
+        
+        if not instance_id or not token or not phone or token == "YOUR_WHATSAPP_GATEWAY_TOKEN":
+            print("[WhatsApp] Skip: Missing credentials.")
+            return
+
+        message = self.generate_message_text(signal)
+        url = f"https://api.ultramsg.com/{instance_id}/messages/chat"
+        payload = {
+            "token": token,
+            "to": phone,
+            "body": message
+        }
+        
+        try:
+            r = requests.post(url, data=payload, timeout=5)
+            if r.status_code == 200:
+                print(f"[WhatsApp] Broadcast successful to {phone} for {signal['symbol']}.")
+            else:
+                print(f"[WhatsApp] Error: {r.status_code} - {r.text}")
+        except Exception as e:
+            print(f"[WhatsApp] Connection failed: {e}")

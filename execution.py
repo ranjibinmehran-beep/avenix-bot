@@ -2,7 +2,6 @@ import json
 import os
 import time
 
-# Try to import MetaTrader5 gracefully (MT5 library is natively designed for Windows laptops/desktops)
 MT5_AVAILABLE = False
 try:
     import MetaTrader5 as mt5
@@ -17,7 +16,6 @@ class OrderExecutionEngine:
         self.config = self.load_json(self.config_path)
         self.portfolio = self.load_portfolio()
         
-        # Initialize selected broker connection if not paper trading
         self.broker_type = self.config.get("broker_type", "paper").lower()
         if self.broker_type == "forex_mt5":
             self.initialize_mt5()
@@ -48,12 +46,8 @@ class OrderExecutionEngine:
         self.save_json(self.portfolio_path, self.portfolio)
 
     def initialize_mt5(self):
-        """
-        Initializes MetaTrader 5 terminal connection.
-        Supports both Demo and Real server login.
-        """
         if not MT5_AVAILABLE:
-            print("[MT5 Broker] Warning: MetaTrader5 package is not installed or not on a Windows environment. Falling back to Paper simulation.")
+            print("[MT5 Broker] Warning: MetaTrader5 not available.")
             return False
             
         account = self.config.get("mt5_account_id", "")
@@ -61,29 +55,26 @@ class OrderExecutionEngine:
         server = self.config.get("mt5_server", "Exness-MT5-Trial")
         
         if not account or not password:
-            print("[MT5 Broker] Missing account credentials. Run as Demo simulation.")
             return False
             
-        # Initialize connection
         if not mt5.initialize():
-            print("[MT5 Broker] Failed to initialize MT5 terminal.")
             return False
             
-        # Login to Real / Demo account
         authorized = mt5.login(login=int(account), password=password, server=server)
         if authorized:
-            print(f"[MT5 Broker] Successfully connected to {server} (Account: {account})")
-            # Read real balance from MT5 terminal
+            print(f"[MT5 Broker] Successfully connected to {server}")
             account_info = mt5.account_info()
             if account_info:
                 self.portfolio["balance"] = account_info.balance
                 self.save_portfolio()
             return True
-        else:
-            print(f"[MT5 Broker] Authentication failed on MT5 server: {server}")
-            return False
+        return False
 
     def open_trade(self, symbol, side, entry_price, sl, tp1, tp2, tp3, reason):
+        # Prevent trading if Prop-Firm Daily Drawdown Guard is breached
+        if self.config.get("prop_drawdown_breached", False):
+            return {"status": "ignored", "reason": "⚠️ [Prop Guard] Trading is locked today due to daily drawdown protection!"}
+
         for active in self.portfolio["active_trades"]:
             if active["symbol"] == symbol:
                 return {"status": "ignored", "reason": f"Already have an active position in {symbol}."}
@@ -129,20 +120,18 @@ class OrderExecutionEngine:
             "pnl_percent": 0.0
         }
 
-        # --- BROKER CONNECTION BRIDGES ---
         if self.broker_type == "forex_mt5" and MT5_AVAILABLE:
-            # Place Order inside MetaTrader 5 (Real/Demo)
             order_type = mt5.ORDER_TYPE_BUY if side == "BUY" else mt5.ORDER_TYPE_SELL
             price = mt5.symbol_info_tick(symbol).ask if side == "BUY" else mt5.symbol_info_tick(symbol).bid
             
             request = {
                 "action": mt5.TRADE_ACTION_DEAL,
                 "symbol": symbol,
-                "volume": round(qty / 100000, 2), # Standard MT5 Lot conversion helper
+                "volume": round(qty / 100000, 2),
                 "type": order_type,
                 "price": price,
                 "sl": sl,
-                "tp": tp3, # Primary long-term target
+                "tp": tp3,
                 "deviation": 20,
                 "magic": 1024,
                 "comment": "Bot Brain MTF",
@@ -154,27 +143,84 @@ class OrderExecutionEngine:
             if result.retcode != mt5.TRADE_RETCODE_DONE:
                 return {"status": "failed", "reason": f"MT5 order rejected: {result.comment}"}
             new_trade["mt5_ticket"] = result.order
-            print(f"[MT5 Broker] Real/Demo trade executed on terminal. Ticket: {result.order}")
 
-        elif self.broker_type == "crypto":
-            # Place Order in Crypto Exchange via CCXT
-            # In live production environment with real keys:
-            # exchange = getattr(ccxt, self.config['exchange'])({'apiKey': api, 'secret': secret})
-            # order = exchange.create_order(symbol, 'market', side, qty, params={'stopLoss': sl, 'takeProfit': tp3})
-            print(f"[Crypto Broker] CCXT Trade submitted. API Orders established for {symbol}")
-
-        # Always track locally in dashboard portfolio to show live performance
         self.portfolio["active_trades"].append(new_trade)
         self.save_portfolio()
-        
-        mode_label = "Paper Simulation" if self.broker_type == "paper" else f"REAL/DEMO Broker ({self.broker_type.upper()})"
-        return {"status": "success", "trade": new_trade, "mode": mode_label}
+        return {"status": "success", "trade": new_trade, "mode": f"REAL/DEMO ({self.broker_type.upper()})"}
 
     def update_active_trades(self, live_prices):
         closed_trades = []
         still_active = []
         portfolio_updated = False
         
+        total_floating_pnl = 0.0
+        balance = self.portfolio["balance"]
+        
+        # Calculate total floating drawdown
+        for trade in self.portfolio["active_trades"]:
+            symbol = trade["symbol"]
+            if symbol in live_prices:
+                current_price = live_prices[symbol]
+                side_multiplier = 1 if trade["side"] == "BUY" else -1
+                pnl_cash = trade["qty"] * (current_price - trade["entry_price"]) * side_multiplier
+                total_floating_pnl += pnl_cash
+
+        # --- PROP-FIRM / CONTEST DAILY DRAWDOWN GUARD ---
+        # If total floating loss exceeds the prop drawdown limit (e.g. 4%), emergency close all trades!
+        drawdown_limit = self.config.get("prop_drawdown_limit", 4.0) / 100.0
+        max_allowed_loss = - (balance * drawdown_limit)
+        
+        if total_floating_pnl < max_allowed_loss and len(self.portfolio["active_trades"]) > 0:
+            print(f"⚠️ [PROP GUARD BREACH] Floating Loss (${round(total_floating_pnl, 2)}) exceeded limit (${round(max_allowed_loss, 2)}). Triggering Emergency Exit!")
+            
+            # Emergency Close All Trades
+            for trade in self.portfolio["active_trades"]:
+                symbol = trade["symbol"]
+                close_price = live_prices.get(symbol, trade["entry_price"])
+                
+                if self.broker_type == "forex_mt5" and MT5_AVAILABLE and "mt5_ticket" in trade:
+                    position_id = trade["mt5_ticket"]
+                    action_type = mt5.ORDER_TYPE_SELL if trade["side"] == "BUY" else mt5.ORDER_TYPE_BUY
+                    close_price_mt5 = mt5.symbol_info_tick(symbol).bid if trade["side"] == "BUY" else mt5.symbol_info_tick(symbol).ask
+                    
+                    request = {
+                        "action": mt5.TRADE_ACTION_DEAL,
+                        "symbol": symbol,
+                        "volume": round(trade["qty"] / 100000, 2),
+                        "type": action_type,
+                        "position": position_id,
+                        "price": close_price_mt5,
+                        "deviation": 20,
+                        "magic": 1024,
+                        "comment": "Prop Guard Emergency Close",
+                        "type_time": mt5.ORDER_TIME_GTC,
+                        "type_filling": mt5.ORDER_FILL_IOC,
+                    }
+                    mt5.order_send(request)
+
+                side_multiplier = 1 if trade["side"] == "BUY" else -1
+                trade["close_price"] = round(close_price, 4)
+                trade["close_time"] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+                trade["status"] = "CLOSED"
+                trade["close_reason"] = "PROP GUARD EMERGENCY"
+                
+                final_pnl = trade["qty"] * (close_price - trade["entry_price"]) * side_multiplier
+                trade["pnl"] = round(final_pnl, 2)
+                trade["pnl_percent"] = round((final_pnl / trade["entry_price"]) * 100, 2)
+                
+                self.portfolio["balance"] = round(self.portfolio["balance"] + trade["pnl"], 2)
+                self.portfolio["completed_trades"].append(trade)
+                closed_trades.append(trade)
+            
+            # Lock the bot for today to save the FundedNext / Contest account
+            self.config["prop_drawdown_breached"] = True
+            self.save_json(self.config_path, self.config)
+            
+            self.portfolio["active_trades"] = []
+            self.save_portfolio()
+            return closed_trades
+
+        # Standard Update loop if drawdown is not breached
         for trade in self.portfolio["active_trades"]:
             symbol = trade["symbol"]
             if symbol not in live_prices:
@@ -190,7 +236,6 @@ class OrderExecutionEngine:
             trade["pnl"] = round(pnl_cash, 2)
             trade["pnl_percent"] = round(pnl_percent * 100, 2)
             
-            # --- DYNAMIC TRAILING STOP LOGIC ---
             highest_tp = trade.get("highest_tp_reached", 0)
             entry = trade["entry_price"]
             sl = trade["sl"]
@@ -234,9 +279,7 @@ class OrderExecutionEngine:
                     sl_updated = True
                     print(f"🔥 [Trailing Stop] {symbol} hit TP3. Moving SL to TP2 ({tp2})")
 
-            # Update order constraints in MT5 Broker if active
             if sl_updated and self.broker_type == "forex_mt5" and MT5_AVAILABLE and "mt5_ticket" in trade:
-                # Modify existing MT5 SL parameters in broker database
                 request = {
                     "action": mt5.TRADE_ACTION_SLTP,
                     "position": trade["mt5_ticket"],
@@ -244,12 +287,10 @@ class OrderExecutionEngine:
                     "tp": tp3
                 }
                 mt5.order_send(request)
-                print(f"[MT5 Broker] Transmitted Trailing Stop command to broker server for Position #{trade['mt5_ticket']}")
 
             if sl_updated:
                 portfolio_updated = True
 
-            # --- EXIT CHECKS ---
             hit_sl = False
             hit_tp = False
             close_reason = ""
@@ -275,9 +316,7 @@ class OrderExecutionEngine:
                     close_reason = "TAKE PROFIT 3 (FINAL)"
 
             if hit_sl or hit_tp:
-                # If using real MT5, close position in terminal
                 if self.broker_type == "forex_mt5" and MT5_AVAILABLE and "mt5_ticket" in trade:
-                    # Send close request
                     position_id = trade["mt5_ticket"]
                     action_type = mt5.ORDER_TYPE_SELL if trade["side"] == "BUY" else mt5.ORDER_TYPE_BUY
                     close_price_mt5 = mt5.symbol_info_tick(symbol).bid if trade["side"] == "BUY" else mt5.symbol_info_tick(symbol).ask
