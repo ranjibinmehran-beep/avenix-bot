@@ -47,22 +47,16 @@ class OrderExecutionEngine:
 
     def initialize_mt5(self):
         if not MT5_AVAILABLE:
-            print("[MT5 Broker] Warning: MetaTrader5 not available.")
             return False
-            
         account = self.config.get("mt5_account_id", "")
         password = self.config.get("mt5_password", "")
         server = self.config.get("mt5_server", "Exness-MT5-Trial")
-        
         if not account or not password:
             return False
-            
         if not mt5.initialize():
             return False
-            
         authorized = mt5.login(login=int(account), password=password, server=server)
         if authorized:
-            print(f"[MT5 Broker] Successfully connected to {server}")
             account_info = mt5.account_info()
             if account_info:
                 self.portfolio["balance"] = account_info.balance
@@ -70,10 +64,9 @@ class OrderExecutionEngine:
             return True
         return False
 
-    def open_trade(self, symbol, side, entry_price, sl, tp1, tp2, tp3, reason):
-        # Prevent trading if Prop-Firm Daily Drawdown Guard is breached
+    def open_trade(self, symbol, side, entry_price, sl, tp1, tp2, tp3, reason, is_manual=False):
         if self.config.get("prop_drawdown_breached", False):
-            return {"status": "ignored", "reason": "⚠️ [Prop Guard] Trading is locked today due to daily drawdown protection!"}
+            return {"status": "ignored", "reason": "⚠️ [Prop Guard] Daily drawdown protection lock is active!"}
 
         for active in self.portfolio["active_trades"]:
             if active["symbol"] == symbol:
@@ -114,10 +107,11 @@ class OrderExecutionEngine:
             "qty": round(qty, 6),
             "notional_value": round(notional_value, 2),
             "open_time": time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()),
-            "reason": reason,
+            "reason": "ثبت معامله دستی" if is_manual else reason,
             "current_price": entry_price,
             "pnl": 0.0,
-            "pnl_percent": 0.0
+            "pnl_percent": 0.0,
+            "is_manual": is_manual
         }
 
         if self.broker_type == "forex_mt5" and MT5_AVAILABLE:
@@ -134,7 +128,7 @@ class OrderExecutionEngine:
                 "tp": tp3,
                 "deviation": 20,
                 "magic": 1024,
-                "comment": "Bot Brain MTF",
+                "comment": "Manual Avenix" if is_manual else "Bot Brain MTF",
                 "type_time": mt5.ORDER_TIME_GTC,
                 "type_filling": mt5.ORDER_FILL_IOC,
             }
@@ -146,7 +140,66 @@ class OrderExecutionEngine:
 
         self.portfolio["active_trades"].append(new_trade)
         self.save_portfolio()
-        return {"status": "success", "trade": new_trade, "mode": f"REAL/DEMO ({self.broker_type.upper()})"}
+        
+        mode_label = "Paper Simulation" if self.broker_type == "paper" else f"REAL/DEMO ({self.broker_type.upper()})"
+        return {"status": "success", "trade": new_trade, "mode": mode_label}
+
+    def close_trade_manually(self, trade_id, current_price):
+        """
+        Closes any active position manually from the dashboard.
+        Instantly triggers close requests in MT5 / local paper databases.
+        """
+        still_active = []
+        closed_trade = None
+        
+        for trade in self.portfolio["active_trades"]:
+            if trade["id"] == trade_id:
+                closed_trade = trade
+            else:
+                still_active.append(trade)
+                
+        if closed_trade:
+            symbol = closed_trade["symbol"]
+            
+            # If using MT5, execute emergency close in broker terminal
+            if self.broker_type == "forex_mt5" and MT5_AVAILABLE and "mt5_ticket" in closed_trade:
+                position_id = closed_trade["mt5_ticket"]
+                action_type = mt5.ORDER_TYPE_SELL if closed_trade["side"] == "BUY" else mt5.ORDER_TYPE_BUY
+                close_price_mt5 = mt5.symbol_info_tick(symbol).bid if closed_trade["side"] == "BUY" else mt5.symbol_info_tick(symbol).ask
+                
+                request = {
+                    "action": mt5.TRADE_ACTION_DEAL,
+                    "symbol": symbol,
+                    "volume": round(closed_trade["qty"] / 100000, 2),
+                    "type": action_type,
+                    "position": position_id,
+                    "price": close_price_mt5,
+                    "deviation": 20,
+                    "magic": 1024,
+                    "comment": "Manual Emergency Close",
+                    "type_time": mt5.ORDER_TIME_GTC,
+                    "type_filling": mt5.ORDER_FILL_IOC,
+                }
+                mt5.order_send(request)
+
+            side_multiplier = 1 if closed_trade["side"] == "BUY" else -1
+            closed_trade["close_price"] = round(current_price, 4)
+            closed_trade["close_time"] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+            closed_trade["status"] = "CLOSED"
+            closed_trade["close_reason"] = "MANUAL EMERGENCY"
+            
+            final_pnl = closed_trade["qty"] * (current_price - closed_trade["entry_price"]) * side_multiplier
+            closed_trade["pnl"] = round(final_pnl, 2)
+            closed_trade["pnl_percent"] = round((final_pnl / closed_trade["entry_price"]) * 100, 2)
+            
+            self.portfolio["balance"] = round(self.portfolio["balance"] + closed_trade["pnl"], 2)
+            self.portfolio["completed_trades"].append(closed_trade)
+            
+            self.portfolio["active_trades"] = still_active
+            self.save_portfolio()
+            return closed_trade
+            
+        return None
 
     def update_active_trades(self, live_prices):
         closed_trades = []
@@ -156,7 +209,6 @@ class OrderExecutionEngine:
         total_floating_pnl = 0.0
         balance = self.portfolio["balance"]
         
-        # Calculate total floating drawdown
         for trade in self.portfolio["active_trades"]:
             symbol = trade["symbol"]
             if symbol in live_prices:
@@ -165,15 +217,11 @@ class OrderExecutionEngine:
                 pnl_cash = trade["qty"] * (current_price - trade["entry_price"]) * side_multiplier
                 total_floating_pnl += pnl_cash
 
-        # --- PROP-FIRM / CONTEST DAILY DRAWDOWN GUARD ---
-        # If total floating loss exceeds the prop drawdown limit (e.g. 4%), emergency close all trades!
         drawdown_limit = self.config.get("prop_drawdown_limit", 4.0) / 100.0
         max_allowed_loss = - (balance * drawdown_limit)
         
         if total_floating_pnl < max_allowed_loss and len(self.portfolio["active_trades"]) > 0:
-            print(f"⚠️ [PROP GUARD BREACH] Floating Loss (${round(total_floating_pnl, 2)}) exceeded limit (${round(max_allowed_loss, 2)}). Triggering Emergency Exit!")
-            
-            # Emergency Close All Trades
+            print(f"⚠️ [PROP GUARD BREACH] Floating Loss exceeded limit. Triggering Emergency Exit!")
             for trade in self.portfolio["active_trades"]:
                 symbol = trade["symbol"]
                 close_price = live_prices.get(symbol, trade["entry_price"])
@@ -212,7 +260,6 @@ class OrderExecutionEngine:
                 self.portfolio["completed_trades"].append(trade)
                 closed_trades.append(trade)
             
-            # Lock the bot for today to save the FundedNext / Contest account
             self.config["prop_drawdown_breached"] = True
             self.save_json(self.config_path, self.config)
             
@@ -220,7 +267,6 @@ class OrderExecutionEngine:
             self.save_portfolio()
             return closed_trades
 
-        # Standard Update loop if drawdown is not breached
         for trade in self.portfolio["active_trades"]:
             symbol = trade["symbol"]
             if symbol not in live_prices:
@@ -250,34 +296,28 @@ class OrderExecutionEngine:
                     trade["highest_tp_reached"] = 1
                     trade["sl"] = entry
                     sl_updated = True
-                    print(f"🔥 [Trailing Stop] {symbol} hit TP1. Moving SL to Entry ({entry})")
                 if current_price >= tp2 and highest_tp < 2:
                     trade["highest_tp_reached"] = 2
                     trade["sl"] = tp1
                     sl_updated = True
-                    print(f"🔥 [Trailing Stop] {symbol} hit TP2. Moving SL to TP1 ({tp1})")
                 if current_price >= tp3 and highest_tp < 3:
                     trade["highest_tp_reached"] = 3
                     trade["sl"] = tp2
                     sl_updated = True
-                    print(f"🔥 [Trailing Stop] {symbol} hit TP3. Moving SL to TP2 ({tp2})")
 
             else: # SELL
                 if current_price <= tp1 and highest_tp < 1:
                     trade["highest_tp_reached"] = 1
                     trade["sl"] = entry
                     sl_updated = True
-                    print(f"🔥 [Trailing Stop] {symbol} hit TP1. Moving SL to Entry ({entry})")
                 if current_price <= tp2 and highest_tp < 2:
                     trade["highest_tp_reached"] = 2
                     trade["sl"] = tp1
                     sl_updated = True
-                    print(f"🔥 [Trailing Stop] {symbol} hit TP2. Moving SL to TP1 ({tp1})")
                 if current_price <= tp3 and highest_tp < 3:
                     trade["highest_tp_reached"] = 3
                     trade["sl"] = tp2
                     sl_updated = True
-                    print(f"🔥 [Trailing Stop] {symbol} hit TP3. Moving SL to TP2 ({tp2})")
 
             if sl_updated and self.broker_type == "forex_mt5" and MT5_AVAILABLE and "mt5_ticket" in trade:
                 request = {
