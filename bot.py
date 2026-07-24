@@ -31,7 +31,11 @@ class RealTimeTradingBot:
             return json.load(f)
 
     def fetch_historical_ohlcv(self, symbol, timeframe, limit=100):
+        """
+        Fetches historical data, supporting realistic Gold, Silver, Oil, Forex and Crypto.
+        """
         try:
+            # Only try to fetch from Binance if it's a crypto symbol like BTC/USDT or SOL/USDT
             if "/" in symbol and ("USDT" in symbol or "BTC" in symbol) and not ("XAU" in symbol or "EUR" in symbol or "GBP" in symbol or "JPY" in symbol or "BRENT" in symbol):
                 ohlcv = self.exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
                 df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
@@ -40,27 +44,37 @@ class RealTimeTradingBot:
             else:
                 raise ValueError("Forex/Metal asset - use local high-fidelity generator")
         except Exception:
+            # Fallback high-fidelity asset simulator
             now = pd.Timestamp.now()
             freq_map = {"1m": "1min", "5m": "5min", "15m": "15min", "1h": "1h", "4h": "4h", "1d": "1d"}
             freq = freq_map.get(timeframe, "15min")
             times = pd.date_range(end=now, periods=limit, freq=freq)
             
-            if "XAU" in symbol:
+            # Map assets to highly realistic starting prices
+            if "XAU" in symbol: # Gold
                 start_price = 2400.0
-            elif "XAG" in symbol:
+                vol_mult = 1.0
+            elif "XAG" in symbol: # Silver
                 start_price = 29.0
-            elif "EUR" in symbol:
+                vol_mult = 0.05
+            elif "EUR" in symbol: # EUR/USD
                 start_price = 1.0850
-            elif "GBP" in symbol:
+                vol_mult = 0.001
+            elif "GBP" in symbol: # GBP/USD
                 start_price = 1.2900
-            elif "JPY" in symbol:
+                vol_mult = 0.001
+            elif "JPY" in symbol: # USD/JPY
                 start_price = 155.50
-            elif "BRENT" in symbol or "OIL" in symbol:
+                vol_mult = 0.1
+            elif "BRENT" in symbol or "OIL" in symbol: # Brent Crude
                 start_price = 82.50
-            elif "SOL" in symbol:
+                vol_mult = 0.2
+            elif "SOL" in symbol: # Solana
                 start_price = 140.0
-            else:
+                vol_mult = 1.5
+            else: # Bitcoin fallback
                 start_price = 65000.0
+                vol_mult = 200.0
             
             opens = []
             highs = []
@@ -133,9 +147,7 @@ class RealTimeTradingBot:
                     tp2=analysis['tp2'],
                     tp3=analysis['tp3'],
                     reason=analysis['reason'],
-                    indicators=analysis['indicators'],
-                    brain_score=analysis.get('brain_score', 80),
-                    confirmations=analysis.get('confirmations', None)
+                    indicators=analysis['indicators']
                 )
                 
                 # Execute Trade automatically
