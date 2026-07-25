@@ -3,11 +3,17 @@
   "paper_trading": true,
   "symbols": [
     "XAU/USD",
+    "XAG/USD",
     "EUR/USD",
     "GBP/USD",
     "USD/JPY",
     "BRENT/USD",
-    "SOL/USDT"
+    "BTC/USDT",
+    "ETH/USDT",
+    "BNB/USDT",
+    "SOL/USDT",
+    "DOGE/USDT",
+    "XRP/USDT"
   ],
   "timeframes": [
     "1m",

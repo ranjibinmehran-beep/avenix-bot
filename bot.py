@@ -32,7 +32,8 @@ class RealTimeTradingBot:
 
     def fetch_historical_ohlcv(self, symbol, timeframe, limit=100):
         try:
-            if "/" in symbol and ("USDT" in symbol or "BTC" in symbol) and not ("XAU" in symbol or "EUR" in symbol or "GBP" in symbol or "JPY" in symbol or "BRENT" in symbol):
+            # Check if it's a crypto symbol supported on Binance
+            if "/" in symbol and ("USDT" in symbol or "BTC" in symbol) and not ("XAU" in symbol or "XAG" in symbol or "EUR" in symbol or "GBP" in symbol or "JPY" in symbol or "BRENT" in symbol):
                 ohlcv = self.exchange.fetch_ohlcv(symbol, timeframe, limit=limit)
                 df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
                 df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
@@ -57,10 +58,20 @@ class RealTimeTradingBot:
                 start_price = 155.50
             elif "BRENT" in symbol or "OIL" in symbol:
                 start_price = 82.50
+            elif "BTC" in symbol:
+                start_price = 65000.0
+            elif "ETH" in symbol:
+                start_price = 3400.0
+            elif "BNB" in symbol:
+                start_price = 580.0
             elif "SOL" in symbol:
                 start_price = 140.0
+            elif "DOGE" in symbol:
+                start_price = 0.12
+            elif "XRP" in symbol:
+                start_price = 0.60
             else:
-                start_price = 65000.0
+                start_price = 100.0
             
             opens = []
             highs = []
@@ -188,3 +199,4 @@ class RealTimeTradingBot:
 if __name__ == "__main__":
     bot = RealTimeTradingBot()
     bot.start_loop()
+

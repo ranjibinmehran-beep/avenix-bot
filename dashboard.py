@@ -29,7 +29,7 @@ st.set_page_config(
 # Premium iOS-like minimalist styling CSS
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght=300;400;500;700&display=swap');
     
     html, body, [data-testid="stSidebar"] {
         font-family: 'Vazirmatn', sans-serif !important;
@@ -139,7 +139,6 @@ signals = load_signals()
 if "terms_accepted" not in st.session_state:
     st.session_state.terms_accepted = False
 
-# ----------------- MULTI-LANGUAGE ENGINE (فارسی / ENGLISH / العربية / TÜRKÇE) -----------------
 # Setup language selector on the top-right header
 lang_col1, lang_col2 = st.columns([7, 3])
 with lang_col2:
@@ -147,7 +146,7 @@ with lang_col2:
 
 lang_code = "fa" if selected_lang == "فارسی" else ("en" if selected_lang == "English" else ("ar" if selected_lang == "العربية" else "tr"))
 
-# Complete 4-Language UI Dictionary
+# Complete 4-Language UI Dictionary - ensuring ZERO missing keys!
 TXT = {
     "fa": {
         "title": "🦅 پلتفرم معاملاتی هوشمند آونیکس",
@@ -334,7 +333,7 @@ TXT = {
         "wa_inst": "WhatsApp Instance ID",
         "wa_token": "WhatsApp Token",
         "wa_phone": "Target Phone Number",
-        "symbols_under_watch": "Symbols Under Watch",
+        "symbols_under_watch": "Symbols Under Watch (Comma separated)",
         "main_tf_scan": "Main Scan Timeframe",
         "reset_wallet_btn": "🔄 Reset Demo Portfolio",
         "save_settings_btn": "💾 Save & Apply All Configs",
@@ -348,6 +347,206 @@ TXT = {
         "sl_ratio": "Initial Stop Loss Ratio %",
         "btn_accept_terms": "✅ I fully read and accept the Terms of Service & Disclaimer",
         "locked_terms_desc": "🔒 Please accept the Legal Disclaimer first to unlock Avenix Charts:"
+    },
+    "ar": {
+        "title": "🦅 منصة أفينيكس للتداول الذكي (Avenix)",
+        "sub": "التداول الآلي وإدارة المخاطر لأسواق الفوركس والذهب والعملات الرقمية",
+        "tab_chart": "📊 مخطط تریدینغ‌ویو (شاشة كاملة)",
+        "tab_brain": "🧠 غرفة قيادة عقل الروبوت (AI Brain)",
+        "tab_signals": "📢 أرشيف إشارات التداول",
+        "tab_settings": "⚙️ الإعدادات المتقدمة للنظام",
+        "selector_symbol": "اختر الرمز للتحليل المباشر",
+        "selector_tf": "إطار المخطط الزمني",
+        "tv_caption": "🌐 <b>مخطط TradingView:</b> هذا المخطط تفاعلي بالكامل.",
+        "brain_telemetry": "🧠 مانیتور الروبوت وحالة المؤشرات الفنية",
+        "brain_sub": "قراءة مباشرة لتقييم عقل الروبوت",
+        "force_scan_desc": "يقوم الروبوت بمسح السوق كل 10 ثوانٍ.",
+        "force_scan_btn": "🔥 تشغيل مسح عقل الروبوت الفوري",
+        "isolated_checklist": "📊 تأكيدات المؤشرات المنفصلة",
+        "brain_score_title": "التقييم الإجمالي لقوة الاتجاه (Brain Score)",
+        "score_threshold_desc": "الحد الأدنى للدخول",
+        "checklist_title": "حالة كل مؤشر في التحليل الأخير:",
+        "pnl_report": "💼 الصفقات والمراكز المفتوحة",
+        "balance_title": "إجمالي رصيد المحفظة التجريبية (Balance)",
+        "active_trades_title": "الصفقات النشطة",
+        "broker_badge_title": "منصة التداول المتصلة",
+        "paper_badge": "محاكاة تجريبية (Paper)",
+        "real_badge": "حساب حقيقي وسيط",
+        "active_pnl": "الأرباح العائمة",
+        "entry_price": "سعر الدخول",
+        "live_price": "السعر المباشر",
+        "current_sl": "وقف الخسارة الحالي",
+        "original_sl": "وقف الخسارة الأولي",
+        "targets": "أهداف جني الأرباح",
+        "trailing_step": "خطوة الوقف المتحرك",
+        "completed_history": "✅ تاريخ الصفقات المغلقة",
+        "exit_reason": "أغلقت بسبب",
+        "exit_time": "وقت الإغلاق",
+        "pnl_result": "الربح/الخسارة النهائية",
+        "no_active_trades": "لا توجد صفقات نشطة حالياً.",
+        "no_completed_trades": "أرشيف الصفقات المغلقة فارغ.",
+        "settings_title": "⚙️ الإعدادات المتقدمة للمؤشرات والنظام",
+        "ind_custom": "📊 تكوين المؤشرات المنفردة",
+        "emas_title": "1. المتوسطات المتحركة الأسية (EMAs)",
+        "fast_ema": "فترة المتوسط السريع",
+        "medium_ema": "فترة المتوسط المتوسط",
+        "long_ema": "فترة المتوسط الطويل",
+        "ich_title": "2. مؤشر إيشيموكو (Ichimoku)",
+        "tenkan_val": "فترة خط التحويل",
+        "kijun_val": "فترة خط الأساس",
+        "span_b_val": "فترة خط سنكو ب",
+        "rsi_title": "3. مؤشر القوة النسبية (RSI)",
+        "rsi_period": "فترة RSI",
+        "rsi_os": "حد منطقه البيع",
+        "rsi_ob": "حد منطقه الشراء",
+        "macd_title": "4. مؤشر الماكد",
+        "macd_fast": "ماكد المتوسط السريع",
+        "macd_slow": "ماكد المتوسط البطيء",
+        "macd_signal": "خط إشارة الماكد",
+        "bb_title": "5. حزم بولينجر",
+        "bb_period": "فترة حزمة بولينجر",
+        "bb_std": "الانحراف المعياري (Std Dev)",
+        "risk_title": "🛡️ حجم المخاطرة، أهداف الربح، ومنصة التداول",
+        "risk_pct": "نسبة المخاطرة للحساب (%)",
+        "leverage": "رافعة الهامش المالي",
+        "score_thresh": "عتبة دخول تقييم عقل الروبوت %",
+        "broker_connect_title": "تكوين حساب التداول المتصل",
+        "mt5_desc": "🔌 الاتصال بوسطاء الفوركس أو حسابات تحدي البروب:",
+        "prop_guard_title": "🛡️ حارس حماية الحساب (Avenix Prop Guard)",
+        "prop_limit_desc": "أقصى تراجع يومي مسموح به %",
+        "prop_locked_err": "🚨 تم اختراق الحد الأقصى للتراجع اليومي!",
+        "prop_unlock_btn": "🔓 إعادة ضبط قفل التراجع",
+        "prop_safe": "🟢 حارس التراجع اليومي نشط.",
+        "tp_reward": "🎯 نسب جني الأرباح المتحركة",
+        "social_broadcast_title": "### Sosyal Platform Yayın",
+        "social_broadcast_sub": "بث تقارير تحليل الروبوت",
+        "tg_title": "1. واجهة تلجرام (Telegram)",
+        "tg_enable": "تفعيل البث المباشر",
+        "tg_token": "رمز بوت تلجرام",
+        "tg_chat": "معرف قناة تلجرام",
+        "bale_title": "2. واجهة بله الإيرانية",
+        "bale_enable": "تفعيل البث المباشر",
+        "bale_token": "رمز بوت بله",
+        "bale_chat": "معرف قناة بله",
+        "wa_title": "3. بوابة واتساب (WhatsApp)",
+        "wa_enable": "تفعيل البث المباشر",
+        "wa_inst": "معرف مثيل واتساب",
+        "wa_token": "رمز بوابة واتساب",
+        "wa_phone": "رقم الهاتف",
+        "symbols_under_watch": "الرموز تحت المراقبة",
+        "main_tf_scan": "الإطار الزمني الرئيسي",
+        "reset_wallet_btn": "🔄 إعادة ضبط المحفظة",
+        "save_settings_btn": "💾 حفظ وتطبيق جميع الإعدادات",
+        "manual_term_title": "🚀 محطة التداول اليدوي",
+        "manual_term_sub": "إرسال صفقات يدوية فورية.",
+        "btn_buy": "🚀 شراء (BUY)",
+        "btn_sell": "🚨 بيع (SELL)",
+        "btn_close_trade": "❌ إغلاق طوارئ",
+        "disclaimer_title": "⚠️ إخلاء المسؤولية القانونية وشروط الخدمة",
+        "disclaimer_body": "التداول في الأسواق المالية الدولية ينطوي على مخاطر عالية جداً.",
+        "sl_ratio": "نسبة وقف الخسارة الأولي %",
+        "btn_accept_terms": "✅ أوافق على شروط الخدمة",
+        "locked_terms_desc": "🔒 يرجى قبول إخلاء المسؤولية أولاً:"
+    },
+    "tr": {
+        "title": "🦅 Avenix Akıllı Algoritmik Ticaret Platformu",
+        "sub": "Forex, Değerli Metaller ve Kripto Piyasaları için Otomatik İşlem ve Risk Yönetimi",
+        "tab_chart": "📊 TradingView Canlı Grafik (Tam Ekran)",
+        "tab_brain": "🧠 Robot Komuta Odası (AI Brain)",
+        "tab_signals": "📢 Sinyal Arşivi",
+        "tab_settings": "⚙️ Gelişmiş Sistem Ayarları",
+        "selector_symbol": "Canlı Analiz İçin Varlık Seçin",
+        "selector_tf": "Grafik Zaman Dilimi",
+        "tv_caption": "🌐 <b>TradingView Terminali:</b> Bu grafik tamamen etkileşimlidir.",
+        "brain_telemetry": "🧠 Robot Telemetrisi ve Gösterge Durumu",
+        "brain_sub": "Robotun karar mekanizması ve her teknik gösterge için onay durumları",
+        "force_scan_desc": "Robot her 10 saniyede bir piyasayı tarar.",
+        "force_scan_btn": "🔥 Anında Robot Taraması Başlat",
+        "isolated_checklist": "📊 Bağımsız Gösterge Onayları",
+        "brain_score_title": "Konsolide Güç Skoru (Brain Score)",
+        "score_threshold_desc": "Giriş Eşiği",
+        "checklist_title": "Son taramadaki bireysel gösterge durumları:",
+        "pnl_report": "💼 Canlı Pozisyonlar ve Emirler",
+        "balance_title": "Demo Cüzdan Bakiyesi (Balance)",
+        "active_trades_title": "Aktif Pozisyonlar",
+        "broker_badge_title": "Bağlı İşlem Köprüsü",
+        "paper_badge": "Simüle Demo (Paper)",
+        "real_badge": "Gerçek Broker Sunucusu",
+        "active_pnl": "Anlık Kâr/Zarar",
+        "entry_price": "Giriş Fiyatı",
+        "live_price": "Canlı Fiyat",
+        "current_sl": "Mevcut Durdurma Noktası",
+        "original_sl": "İlk Durdurma Noktası",
+        "targets": "Kâr Hedefleri",
+        "trailing_step": "Takip Eden Adım",
+        "completed_history": "✅ Kapatılan İşlemler Geçmişi",
+        "exit_reason": "Kapatılma Nedeni",
+        "exit_time": "Kapatılma Zamanı",
+        "pnl_result": "Net Kâr/Zarar",
+        "no_active_trades": "Şu anda aktif işlem bulunmamaktadır.",
+        "no_completed_trades": "Kapatılan işlem geçmişi boş.",
+        "settings_title": "⚙️ Gelişmiş Gösterge ve Sistem Yapılandırması",
+        "ind_custom": "📊 Bireysel Gösterge Kurulumları",
+        "emas_title": "1. Üstel Hareketli Ortalamalar (EMAs)",
+        "fast_ema": "Hızlı EMA Periyodu",
+        "medium_ema": "Orta EMA Periyodu",
+        "long_ema": "Uzun EMA Trend Filtresi",
+        "ich_title": "2. Ichimoku Kinko Hyo",
+        "tenkan_val": "Tenkan-sen Periyodu",
+        "kijun_val": "Kijun-sen Periyodu",
+        "span_b_val": "Senkou Span B Periyodu",
+        "rsi_title": "3. Göreceli Güç Endeksi (RSI)",
+        "rsi_period": "RSI Periyodu",
+        "rsi_os": "Aşırı Satım Sınırı",
+        "rsi_ob": "Aşırı Alım Sınırı",
+        "macd_title": "4. MACD Yapılandırması",
+        "macd_fast": "MACD Hızlı EMA",
+        "macd_slow": "MACD Yavaş EMA",
+        "macd_signal": "MACD Sinyal Çizgisi",
+        "bb_title": "5. Bollinger Bantları",
+        "bb_period": "Bollinger Periyodu",
+        "bb_std": "Standart Sapma (Std Dev)",
+        "risk_title": "🛡️ Risk Sınırları, Hedef Kârlar ve Broker Köprüsü",
+        "risk_pct": "Hesap Risk Yüzdesi (%)",
+        "leverage": "Kaldıraç Faktörü",
+        "score_thresh": "Robot Giriş Skor Eşiği %",
+        "broker_connect_title": "Bağlantılı Hesap Kurulumu (Gerçek/Demo)",
+        "mt5_desc": "🔌 Forex Brokerine veya Prop-Firm hesap mücadelesine bağlanın:",
+        "prop_guard_title": "🛡️ Günlük Kayıp Limiti Koruyucusu (Avenix Prop Guard)",
+        "prop_limit_desc": "İzin Verilen Maksimum Günlük Hesap Kaybı %",
+        "prop_locked_err": "🚨 Günlük kayıp sınırı aşıldı!",
+        "prop_unlock_btn": "🔓 Günlük Kayıp Kilidini Sıfırla",
+        "prop_safe": "🟢 Günlük kayıp koruması aktif.",
+        "tp_reward": "🎯 Takip Eden Kâr Oranları",
+        "social_broadcast_title": "### Sosyal Platform Yayın",
+        "social_broadcast_sub": "Robot analiz raporlarını yayınlayın",
+        "tg_title": "1. Telegram Messenger API",
+        "tg_enable": "Telegram Yayınını Etkinleştir",
+        "tg_token": "Telegram Bot Token",
+        "tg_chat": "Telegram Kanal Kimliği",
+        "bale_title": "2. Bale Messenger API",
+        "bale_enable": "Bale Yayınını Etkinleştir",
+        "bale_token": "Bale Bot Token",
+        "bale_chat": "Bale Sohbet Kimliği",
+        "wa_title": "3. WhatsApp API Ağ Geçidi",
+        "wa_enable": "WhatsApp Yayınını Etkinleştir",
+        "wa_inst": "WhatsApp Instance ID",
+        "wa_token": "WhatsApp Token",
+        "wa_phone": "Hedef Telefon Numarası",
+        "symbols_under_watch": "İzlenen Semboller",
+        "main_tf_scan": "Ana Tarama Zaman Dilimi",
+        "reset_wallet_btn": "🔄 Demo Cüzdanı Sıfırla",
+        "save_settings_btn": "💾 Ayarları Kaydet ve Uygula",
+        "manual_term_title": "🚀 Manuel İşlem Terminali",
+        "manual_term_sub": "Manuel işlem gönderin.",
+        "btn_buy": "🚀 Manuel ALIM (BUY)",
+        "btn_sell": "🚨 Manuel SAT (SELL)",
+        "btn_close_trade": "❌ Manuel Acil Kapat",
+        "disclaimer_title": "⚠️ Yasal Uyarı ve Hizmet Şartları",
+        "disclaimer_body": "Uluslararası finansal piyasalarda işlem yapmak yüksek risk taşır.",
+        "sl_ratio": "İlk Durdurma Noktası Oranı %",
+        "btn_accept_terms": "✅ Kullanım Şartlarını kabul ediyorum",
+        "locked_terms_desc": "🔒 Avenix grafiklerini açmak için lütfen önce Yasal Uyarıyı onaylayın:"
     }
 }
 
@@ -427,12 +626,17 @@ else:
 
         symbol_mapping = {
             "XAU/USD": "OANDA:XAUUSD",
+            "XAG/USD": "OANDA:XAGUSD",
             "EUR/USD": "FX:EURUSD",
             "GBP/USD": "FX:GBPUSD",
             "USD/JPY": "FX:USDJPY",
             "BRENT/USD": "TVC:UKOIL",
+            "BTC/USDT": "BINANCE:BTCUSDT",
+            "ETH/USDT": "BINANCE:ETHUSDT",
+            "BNB/USDT": "BINANCE:BNBUSDT",
             "SOL/USDT": "BINANCE:SOLUSDT",
-            "BTC/USDT": "BINANCE:BTCUSDT"
+            "DOGE/USDT": "BINANCE:DOGEUSDT",
+            "XRP/USDT": "BINANCE:XRPUSDT"
         }
         
         tv_symbol = symbol_mapping.get(selected_symbol, "OANDA:XAUUSD")
@@ -691,8 +895,6 @@ else:
 
         # 3. Connection Expanders
         with st.expander("🔌 ۳. اتصال صرافی کریپتو / بروکر فارکس و سپر امنیتی پروپ‌فرم"):
-            current_b = config.get("broker_type", "paper").lower()
-            b_idx = 0 if current_b == "paper" else (1 if current_b == "crypto" else 2)
             broker_opt = st.selectbox(
                 t["broker_connect_title"],
                 ["شبیه‌ساز تستی (Paper Trading)", "صرافی کریپتو (Binance, Bybit via CCXT)", "بروکر فارکس و پروپ‌فرم‌ها (MetaTrader 5)"],
@@ -754,6 +956,24 @@ else:
                 wa_inst = st.text_input(t["wa_inst"], value=config.get("whatsapp_instance_id", "instance99999"))
                 wa_tok = st.text_input(t["wa_token"], value=config.get("whatsapp_token", ""))
                 wa_phone = st.text_input(t["wa_phone"], value=config.get("whatsapp_phone", ""))
+
+            # DEDICATED SOCIAL SAVE BUTTON (Save instantly!)
+            st.markdown("---")
+            if st.button("💾 ذخیره فوری تنظیمات شبکه‌های اجتماعی (Bale, Telegram, WhatsApp)", use_container_width=True):
+                config["enable_telegram"] = tg_enabled
+                config["telegram_bot_token"] = tg_tok
+                config["telegram_chat_id"] = tg_chat
+                config["enable_bale"] = bale_enabled
+                config["bale_bot_token"] = bale_tok
+                config["bale_chat_id"] = bale_chat
+                config["enable_whatsapp"] = wa_enabled
+                config["whatsapp_instance_id"] = wa_inst
+                config["whatsapp_token"] = wa_tok
+                config["whatsapp_phone"] = wa_phone
+                save_config(config)
+                st.success("Social Broadcast Settings Saved successfully!")
+                time.sleep(1)
+                st.rerun()
 
         with st.expander("📊 ۵. جفت‌ارزهای فعال تحت نظر و تایم‌فریم اسکن"):
             symbols_input = st.text_input(t["symbols_under_watch"], value=", ".join(config.get("symbols", ["XAU/USD", "EUR/USD", "GBP/USD", "USD/JPY", "BRENT/USD", "SOL/USDT"])))
