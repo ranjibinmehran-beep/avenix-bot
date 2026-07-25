@@ -691,6 +691,8 @@ else:
 
         # 3. Connection Expanders
         with st.expander("🔌 ۳. اتصال صرافی کریپتو / بروکر فارکس و سپر امنیتی پروپ‌فرم"):
+            current_b = config.get("broker_type", "paper").lower()
+            b_idx = 0 if current_b == "paper" else (1 if current_b == "crypto" else 2)
             broker_opt = st.selectbox(
                 t["broker_connect_title"],
                 ["شبیه‌ساز تستی (Paper Trading)", "صرافی کریپتو (Binance, Bybit via CCXT)", "بروکر فارکس و پروپ‌فرم‌ها (MetaTrader 5)"],
